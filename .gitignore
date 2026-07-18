@@ -1,0 +1,13 @@
+/secrets/
+/data/
+/logs/
+/uv.lock
+/.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.json
+*.iml
+
