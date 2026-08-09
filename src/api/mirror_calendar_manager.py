@@ -45,7 +45,7 @@ class MirrorCalendarManager:
         self.mappings: dict[str, MappingEvent] = {}
         self.calendars = calendars
 
-    def read_mirror_and_report_errors(self) -> None:
+    def read_mirror_and_report_errors(self, is_audit: bool) -> None:
         """
         Rebuild the sync mapping database by scanning the mirror calendar.
         Only events inside the rolling window are considered.
@@ -59,6 +59,7 @@ class MirrorCalendarManager:
         window_end = now + timedelta(days=540)
         sync_token = None
 
+        old_mapping: Dict[str, MappingEvent] = self.mappings
         self.mappings = {}
         self.bad_events = []
 
@@ -90,28 +91,42 @@ class MirrorCalendarManager:
                         not event.end:
                     bad_event = BadEvent(mirror_event_id=event.mirror_event_id)
                     self.bad_events.append(bad_event)
-                elif ((not self.calendars.is_valid_calendar_id(event.source_calendar_id))
-                      or self.mappings.get(event.source_event_id)):
-                    # it is in a deleted calendar, or is a duplicate copy
+                elif not self.calendars.is_valid_calendar_id(event.source_calendar_id):
                     bad_event = BadEvent(
                         mirror_event_id=event.mirror_event_id
                     )
                     self.bad_events.append(bad_event)
                 else:
-                    self.mappings[event.source_event_id] = \
-                        EventConverter.from_event_to_mapping(event, event.mirror_event_id)
+                    new_map = EventConverter.from_event_to_mapping(event, event.mirror_event_id)
+                    existing_map: Optional[MappingEvent] = self.__match_event(event, self.mappings)
+
+                    if existing_map:
+                        #  a duplicate copy
+                        bad_event = BadEvent(
+                            mirror_event_id=event.mirror_event_id
+                        )
+                        self.bad_events.append(bad_event)
+                    elif is_audit:
+                        old_map: Optional[MappingEvent] = self.__match_event(event, old_mapping)
+                        if not old_map:
+                            logger.warning(f"missing {new_map}")
+                        elif not old_map == new_map:
+                            logger.warning(f"mismatched {old_map} and {new_map}")
+                        self.mappings[event.source_event_id] = new_map
+                    else:
+                        self.mappings[event.source_event_id] = new_map
 
             if not page_token:
                 break
         logger.info(f"Finished reading mirror cnt :{len(self.mappings)} bad : {len(self.bad_events or [])}")
-
         return
 
-    def __match_event(self, event: EventType) -> MappingEvent | None:
+    @classmethod
+    def __match_event(cls, event: EventType, mappings: Dict[str, MappingEvent]) -> MappingEvent | None:
         """ for single_event=true, we only need to match the ids
         the return value is modifiable"""
 
-        mapping = self.mappings.get(event.source_event_id)
+        mapping = mappings.get(event.source_event_id)
         if not mapping:
             return None
         if mapping.source_calendar_id == event.source_calendar_id and event.status == STATUS_OK:
@@ -119,8 +134,18 @@ class MirrorCalendarManager:
         mapping.status = STATUS_BAD
         return None
 
-    def apply_change_to_mirror(self, event: EventType) -> str:
-        mapped_event = self.__match_event(event)
+    def audit(self, event: EventType, and_update: bool = True, always_update: bool = True) -> str:
+        mapped_event = self.__match_event(event, self.mappings)
+
+        if not mapped_event:
+            logger.info(f"Missing  {event.source_event_id}")
+        elif mapped_event.updated_at != event.updated_at:
+            logger.info(f"Differences {mapped_event.source_event_id}")
+        elif not always_update:
+            return "No_action"
+
+        if not and_update:
+            return "difference"
 
         if event.status == STATUS_CANCELLED:
             # DELETE
@@ -142,7 +167,45 @@ class MirrorCalendarManager:
                 event=event
             )
             self.__update_sync_data(event, mapped_event.mirror_event_id)
-            mapped_event.status = "Updated"
+            return "updated"
+
+        else:
+            if not event.source_event_id or \
+                    not event.source_calendar_id or \
+                    not event.status or \
+                    not event.start or \
+                    not event.end:
+                raise InvalidDataError("Create in mirror without support data")
+            created = self.client.create_event(
+                calendar_id=self.mirror_calendar.id,
+                event=event
+            )
+            self.__update_sync_data(event, created["id"])
+            return "added"
+
+    def apply_change_to_mirror(self, event: EventType) -> str:
+        mapped_event = self.__match_event(event, self.mappings)
+
+        if event.status == STATUS_CANCELLED:
+            # DELETE
+            if mapped_event:
+                self.client.delete_event(
+                    calendar_id=self.mirror_calendar.id,
+                    event_id=mapped_event.mirror_event_id
+                )
+            else:
+                return "deleted:NF"
+            self.__update_sync_data(event, mapped_event.mirror_event_id, deleted=True)
+            return "deleted"
+
+        if mapped_event:
+            # UPDATE
+            self.client.update_event(
+                calendar_id=self.mirror_calendar.id,
+                event_id=mapped_event.mirror_event_id,
+                event=event
+            )
+            self.__update_sync_data(event, mapped_event.mirror_event_id)
             return "updated"
 
         else:
@@ -171,12 +234,13 @@ class MirrorCalendarManager:
             self.mappings[source_event_id] = mapping
         else:
             self.mappings[source_event_id] = replace(mapping,
-                                                     last_synced_at=event.last_synced_at
+                                                     last_synced_at=event.last_synced_at,
+                                                     updated_at=event.updated_at
                                                      )
 
     def delete_orphans_using_full_sync(self, source_calendar_id: str, full_source_events: List[GoogleEventData]) -> \
-    dict[
-        str, int]:
+            dict[
+                str, int]:
         """ Delete items that are in the mirror but in the primary calendar that have the sme calendar_id"""
         deleted = 0
 
@@ -208,7 +272,7 @@ class MirrorCalendarManager:
 
         return {"deleted": deleted}
 
-    def delete_bad_events(self) -> None :
+    def delete_bad_events(self) -> None:
         """ Delete items that are listed in the bad_events"""
         if self.bad_events:
             for evt in list(self.bad_events):

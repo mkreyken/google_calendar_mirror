@@ -6,6 +6,7 @@ from src.util.filesystem import get_data_location_as_path, load_json_file, save_
 
 GOOGLE_COLOR_AS_HEX = "google_color_as_hex"
 IS_MASTER_SYNC_COMPUTER = "is_master_sync_computer"
+EMAIL_TO_REPORT = "email_report_to"
 
 SettingsOnDisk = str | bool
 
@@ -33,7 +34,8 @@ class Settings:
     def default_values(cls) ->Dict[str,SettingsOnDisk]:
         values : Dict[str,SettingsOnDisk] = {
             GOOGLE_COLOR_AS_HEX: False,
-            IS_MASTER_SYNC_COMPUTER: True
+            IS_MASTER_SYNC_COMPUTER: True,
+            EMAIL_TO_REPORT: "me"
         }
         return values
 

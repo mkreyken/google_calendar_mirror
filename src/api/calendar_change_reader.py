@@ -18,8 +18,8 @@ class GoogleCalendarChangeReader:
     def __init__(self, client: GoogleCalendarClient, source_calendar: CalendarSourceInfo,
                  calendar_mapper: CalendarMappingApi):
         self.client = client
-        self.source_calendar = source_calendar
-        self.calendar_mapper = calendar_mapper
+        self.source_calendar: CalendarSourceInfo = source_calendar
+        self.calendar_mapper: CalendarMappingApi = calendar_mapper
 
     def _page_through(
             self,
@@ -94,13 +94,12 @@ class GoogleCalendarChangeReader:
         # which is much cheaper than reloading the entire calendar.
         sync_token: TokenStoreValue | None = self.calendar_mapper.get_sync_token(self.source_calendar.id)
 
-        # get a synced baseline
-        if not sync_token or should_run_full_sync(sync_token.date_stamp) or force_full_sync:
-            return self.full_read()
-
         # check to ensure the window is correct
         if is_windowed_read:
             return self.windowed_read()
+
+        if not sync_token or should_run_full_sync(sync_token.date_stamp) or force_full_sync:
+            return self.full_read()
 
         logger.info("Incremental sync")
         # do sync from last sync up only

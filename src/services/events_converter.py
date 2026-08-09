@@ -1,4 +1,5 @@
 # Keywords that trigger sanitization (case-insensitive)
+import logging
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
@@ -7,7 +8,7 @@ from src.api.calendar_source_info import CalendarSourceInfo
 from src.api.types import EventType, GoogleEventData, STATUS_OK, STATUS_CANCELLED, MappingEvent
 from src.clients.settings_on_disk import SETTINGS, GOOGLE_COLOR_AS_HEX
 from src.services.env import SENSITIVE_KEYWORDS
-from src.util.date_util import to_rfc3339
+from src.util.date_util import to_rfc3339, google_to_rfc3339
 from src.util.exceptions import InvalidDataError
 
 """ Google has fixed color ids, 11-20 = calendar, 1-10 = event """
@@ -35,6 +36,8 @@ CALENDAR_TO_EVENT_COLOR_MAP = {
     "19": "8",  # Graphite (calendar) → Graphite (event)
     "20": "10", # Birch → Basil (closest green-ish neutral)
 }
+
+logger = logging.getLogger(__name__)
 
 class EventConverter:
 
@@ -81,7 +84,8 @@ class EventConverter:
             "sync.type": "event_mapping",
             "source.event_id": event.source_event_id,
             "source.calendar_id": event.source_calendar_id,
-            "lastSyncedAt": event.last_synced_at,
+            "source.updated_at" : event.updated_at,
+            "lastSyncedAt": event.last_synced_at
         }
         # prefer the hex colors if they are present
         if event.foreground_color:
@@ -115,7 +119,8 @@ class EventConverter:
             mirror_event_id=mirror_event_id,
             source_calendar_id=evt.source_calendar_id,
             source_event_id=evt.source_event_id,
-            last_synced_at=evt.last_synced_at
+            last_synced_at=evt.last_synced_at,
+            updated_at=evt.updated_at
         )
 
     @classmethod
@@ -138,15 +143,17 @@ class EventConverter:
             private = extended.get("private") or {}
             source_event_id : str  = private.get("source.event_id", "")
             source_calendar_id : str = private.get("source.calendar_id", "")
+            updated_at : str = private.get("source.updated_at","")
             mirror_event_id = my_id
+            if not source_event_id:
+                logger.error(f"Misaligned or bad data : {mirror_event_id}")
         else:
             private = {}
             source_event_id = my_id
             mirror_event_id = None
             source_calendar_id = cal.id
+            updated_at : str = data.get("updated") # the date is a simple date string
 
-        if not source_event_id:
-            raise
 
         return EventType(
             status=status,
@@ -155,6 +162,7 @@ class EventConverter:
             mirror_event_id=mirror_event_id,
             start=data.get("start"),
             end=data.get("end"),
+
 
             summary=data.get("summary",""),
             description=data.get("description",""),
@@ -165,6 +173,7 @@ class EventConverter:
             location=data.get("location"),
             iCalUID=data.get("iCalUID"),
 
+            updated_at= updated_at,
             last_synced_at=str(private.get("lastSyncedAt","")),
 
         )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 from datetime import datetime
-from typing import Any, Optional, List, Dict, cast
+from typing import Any, Optional, Dict, cast
 
 # noinspection PyPackageRequirements
 from google.auth.exceptions import RefreshError
@@ -196,13 +196,13 @@ class GoogleCalendarClient:
             i_cal_uid: Optional[str] = None,
             sync_token: Optional[str] = None,
             updated_min: Optional[datetime] = None,
-    ) -> List[EventType]:
+    ) -> list[GoogleClientJsonType]:
 
         time_min_str = to_rfc3339(time_min)
         time_max_str = to_rfc3339(time_max)
         updated_min_str = to_rfc3339(updated_min)
 
-        events: List[EventType] = []
+        events: list[GoogleClientJsonType] = []
         page_token: Optional[str] = None
 
         while True:

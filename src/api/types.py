@@ -23,7 +23,7 @@ class EventType:
     visibility: Optional[str]
     location: Optional[str]
     iCalUID: Optional[str]
-
+    updated_at : str
     last_synced_at : str
 
 
@@ -46,12 +46,13 @@ class CalendarPageData:
     # across one page
     next_page_token: Optional[str]
 
-@dataclass(frozen=False)
+@dataclass(frozen=True)
 class MappingEvent:
     mirror_event_id: str
     source_calendar_id: str
     source_event_id: str
     last_synced_at: str
+    updated_at: str
     status: str
 
 

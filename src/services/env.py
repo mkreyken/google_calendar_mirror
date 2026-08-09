@@ -40,7 +40,9 @@ MIRROR_MONTHS_MIN = -2
 MIRROR_MONTHS_MAX = 18
 
 FULL_SYNC = "full"
-WINDOWED_SYNC = "time window"
+AUDIT_AND_FIX = "audit and fix time window"
+AUDIT_AND_UPDATE = "audit and update time window"
+AUDIT = "audit time window"
 INCREMENTAL_SYNC = "incremental"
 
 

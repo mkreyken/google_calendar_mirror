@@ -2,12 +2,12 @@ import io
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
 from src.clients.google_mail_client import GmailTextSender
 from src.util.filesystem import get_log_directory
-
 
 JobFunc = Callable[[], None]
 
@@ -57,13 +57,16 @@ def rotate_logs_on_start() -> None:
         os.replace(LOG_FILE, rotated_file)
 
 
-def configure_logging() -> tuple[
-    logging.Logger,
-    logging.FileHandler,
-    logging.StreamHandler,
-    logging.Handler,
-    io.StringIO,
-]:
+@dataclass
+class LoggerData:
+    logger: logging.Logger
+    file_handler: logging.FileHandler
+    console_handler: logging.StreamHandler
+    capture_handler: logging.Handler
+    output_buffer: io.StringIO
+
+
+def configure_logging() -> LoggerData:
     """
     Configure logging for one job run.
 
@@ -102,7 +105,7 @@ def configure_logging() -> tuple[
     job_logger.setLevel(logging.INFO)
     job_logger.propagate = True
 
-    return (
+    return LoggerData(
         job_logger,
         file_handler,
         console_handler,
@@ -118,39 +121,34 @@ def run_job_with_email_report(function: JobFunc, to_email: str) -> None:
     # Rotate before creating the new FileHandler.
     rotate_logs_on_start()
 
-    (
-        logger,
-        file_handler,
-        console_handler,
-        capture_handler,
-        output_buffer,
-    ) = configure_logging()
+    logger_data: LoggerData = configure_logging()
+    logger = logger_data.logger
 
+    logger.info("Job started")
+
+    # noinspection broad-exception
     try:
-        logger.info("Job started")
-
-        try:
-            function()
-        except Exception:
-            logger.exception("Job failed with an unhandled exception")
-
-        # Make sure all messages are written before reading the email body.
-        file_handler.flush()
-        console_handler.flush()
-        capture_handler.flush()
-
-        log_text = output_buffer.getvalue()
+        function()
+    except Exception as ex:
+        logger.exception("Job failed with an unhandled exception", exc_info=ex)
 
     finally:
+        logger_data.file_handler.flush()
+        logger_data.console_handler.flush()
+        logger_data.capture_handler.flush()
+
+        log_text = logger_data.output_buffer.getvalue()
+
         # This closes sync.log and releases the file handle.
         close_existing_logging()
-        output_buffer.close()
+        logger_data.output_buffer.close()
 
     subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
 
-    sender = GmailTextSender()
-    sender.send_text(
-        to=to_email,
-        subject=subject,
-        body=log_text,
-    )
+    if to_email:
+        sender = GmailTextSender()
+        sender.send_text(
+            to=to_email,
+            subject=subject,
+            body=log_text,
+        )

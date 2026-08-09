@@ -1,5 +1,3 @@
-import time
-
 from src.clients.google_mail_client import GmailTextSender
 
 TEST_EMAIL = "michael@icdelta.ca"
@@ -29,5 +27,6 @@ def test_gmail_actor_end_to_end() -> None:
     assert "id" in send_response
     sent_id = send_response["id"]
     print(f"message if was {sent_id}")
+
 
 test_gmail_actor_end_to_end()

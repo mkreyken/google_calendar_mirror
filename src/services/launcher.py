@@ -6,15 +6,15 @@ import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 import pystray  # type: ignore[import-untyped]
 from PIL import Image, ImageDraw, ImageFont
 from pystray import Menu, MenuItem
 
-from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS
+from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_REPORT
 from src.services.controller import Controller
-from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, WINDOWED_SYNC, APP_NAME
+from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
 from src.util.filesystem import get_log_directory
 
 # --- Optional: Windows toast notifications via winrt ---
@@ -103,59 +103,25 @@ class StatusManager:
 # --- Sync logic ---
 
 class SyncManager:
-    def __init__(self, status_manager: StatusManager):
-        self.status_manager = status_manager
+    def __init__(self, status_manager: Optional[StatusManager] = None):
+        self.status_manager: Optional[StatusManager] = status_manager
+        self.to_email :str = SETTINGS.get(EMAIL_TO_REPORT)
 
-    def run_sync_manual(self, kind: str) -> bool:
-        """
-        Replace this with your real sync logic.
-        kind: 'full' or 'partial'
-        Returns True if sync succeeded, False otherwise.
-        """
+    def run_sync(self, kind: str) -> bool:
         app_logger.info(f"Starting {kind} sync...")
         # noinspection PyBroadException
         try:
-            # Simulate work
             controller = Controller()
-            controller.run_with_email_report(kind)
-
-            # Example external script call:
-            # result = subprocess.run(["python", "your_sync_script.py", "--mode", kind])
-            # if result.returncode != 0:
-            #     raise RuntimeError("Sync process failed")
-
+            controller.run_with_email_report(kind, self.to_email)
             success = True
             app_logger.info(f"{kind.capitalize()} sync completed successfully.")
         except Exception:
             app_logger.exception(f"{kind.capitalize()} sync failed.")
             success = False
 
-        self.status_manager.update_status(kind, success)
+        if self.status_manager :
+            self.status_manager.update_status(kind, success)
         return success
-
-    def run_sync_automatic(self, kind: str) -> bool:
-
-        app_logger.info(f"Starting {kind} sync...")
-        # noinspection PyBroadException
-        try:
-            # Simulate work
-            controller = Controller()
-            controller.run_with_email_report(kind)
-
-            # Example external script call:
-            # result = subprocess.run(["python", "your_sync_script.py", "--mode", kind])
-            # if result.returncode != 0:
-            #     raise RuntimeError("Sync process failed")
-
-            success = True
-            app_logger.info(f"{kind.capitalize()} sync completed successfully.")
-        except Exception:
-            app_logger.exception(f"{kind.capitalize()} sync failed.")
-            success = False
-
-        self.status_manager.update_status(kind, success)
-        return success
-
 
 # --- Notifications ---
 
@@ -241,7 +207,7 @@ class TrayController:
 
     def _run_sync_background(self, kind: str):
         def worker() -> None:
-            success = self.sync_manager.run_sync_manual(kind)
+            success = self.sync_manager.run_sync(kind)
             title = "Sync completed" if success else "Sync failed"
             message = f"{kind.capitalize()} sync finished."
             self.notification_manager.send_toast(title, message)
@@ -255,7 +221,7 @@ class TrayController:
         self._run_sync_background(INCREMENTAL_SYNC)
 
     def on_sync_refresh(self) -> None:
-        self._run_sync_background(WINDOWED_SYNC)
+        self._run_sync_background(AUDIT_AND_FIX)
 
     def on_open_log(self) -> None:
         if not self.log_file.exists():
