@@ -22,11 +22,11 @@ class CalendarMappingApi:
     ):
         self.client = client
         self.calendars: dict[str, CalendarSourceInfo] = {}
-        self.mirror_calendar  : CalendarSourceInfo | None = None
+        self.mirror_calendar: CalendarSourceInfo | None = None
         self.keystore: SyncTokenStore = SyncTokenStore(CALENDAR_TOKEN_FILENAME, clear_database)
         self.my_email = None
 
-    def check_id_and_throw(self,calender_id: str) -> None:
+    def check_id_and_throw(self, calender_id: str) -> None:
         if not self.is_valid_calendar_id(calender_id):
             raise ValueError("Invalid Calendar ID")
 
@@ -38,7 +38,7 @@ class CalendarMappingApi:
 
     def update_sync_token(self, calender_id: str, token: TokenStoreValue):
         self.check_id_and_throw(calender_id)
-        if not token.token or not token.date_stamp :
+        if not token.token or not token.date_stamp:
             raise ValueError("Invalid  token")
         self.keystore.set(calender_id, token)
 
@@ -65,7 +65,7 @@ class CalendarMappingApi:
         ]
 
         sources_by_id: dict[str, CalendarSourceInfo] = {}
-        sources_by_name : dict[str, CalendarSourceInfo] = {}
+        sources_by_name: dict[str, CalendarSourceInfo] = {}
         ''' calendar id's are bad right now for google to use on events'''
         color_id = 1
         for cal in kept:
@@ -79,11 +79,11 @@ class CalendarMappingApi:
                 color_id=str(cal.get("colorId", "")),
                 color_id_for_event=str(color_id),
                 short_id=generate_location_short_code(name),
-                foreground_color=str(cal.get("foregroundColor","")),
-                background_color=str(cal.get("backgroundColor","")),
+                foreground_color=str(cal.get("foregroundColor", "")),
+                background_color=str(cal.get("backgroundColor", "")),
             )
             color_id += 1
-            if color_id > 11 : color_id = 1
+            if color_id > 11: color_id = 1
 
             if sources_by_name.get(info.name):
                 raise InvalidDataError(f"Duplicate Calendar Name {info.name}")

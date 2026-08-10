@@ -11,7 +11,6 @@ from googleapiclient.discovery import build  # type: ignore[import-untyped]
 
 from src.util.filesystem import get_credentials_filename, get_tokens_filename
 
-
 # Resource is not exposed
 GoogleCalendarClientType = Any
 
@@ -19,9 +18,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 # noinspection PyMethodMayBeStatic
 class ImageAgent:
-
     SCOPES = [
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.modify"

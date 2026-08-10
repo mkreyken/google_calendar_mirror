@@ -17,6 +17,7 @@ from src.util.filesystem import get_tokens_filename, get_credentials_filename
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
+
 def _build_flow(credentials_file) -> InstalledAppFlow:
     return cast(
         InstalledAppFlow,
@@ -24,6 +25,7 @@ def _build_flow(credentials_file) -> InstalledAppFlow:
             credentials_file,
             SCOPES,
         ))
+
 
 def main() -> None:
     """Shows basic usage of the Google Calendar API.

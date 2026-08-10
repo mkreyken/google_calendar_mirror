@@ -9,11 +9,14 @@ logger = logging.getLogger(__name__)
 class CalendarError(Exception):
     pass
 
+
 class InitializationError(CalendarError):
     pass
 
+
 class InvalidDataError(CalendarError):
     pass
+
 
 class GoogleApiError(CalendarError):
     """Base wrapper for Google API errors."""
@@ -54,7 +57,6 @@ def google_call(func, *args, operation: str = "unset", **kwargs) -> Any:
             # Already deleted → treat as success
             return None
 
-
         logger.error("Google API error %s: %s, %s", status, e, reason)
 
         if status == 403 and reason and reason[0].get("reason") == "rateLimitExceeded":
@@ -66,7 +68,7 @@ def google_call(func, *args, operation: str = "unset", **kwargs) -> Any:
 
         # Not found
         if status == 404:
-             raise GoogleNotFoundError("Resource not found") from e
+            raise GoogleNotFoundError("Resource not found") from e
 
         # Gone
         if status == 410:
@@ -85,4 +87,3 @@ def google_call(func, *args, operation: str = "unset", **kwargs) -> Any:
     except Exception as e:
         logger.exception("Unexpected error during Google API call")
         raise GoogleApiError("Unexpected error") from e
-

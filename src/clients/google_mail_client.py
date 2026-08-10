@@ -5,8 +5,8 @@ from typing import Any, Optional, cast, Dict
 
 # noinspection PyPackageRequirements
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow # type: ignore[import-untyped]
-from googleapiclient.discovery import build # type: ignore[import-untyped]
+from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore[import-untyped]
+from googleapiclient.discovery import build  # type: ignore[import-untyped]
 
 from src.services.env import ALL_GOOGLE_AUTH_SCOPES
 from src.util.exceptions import google_call
@@ -74,7 +74,6 @@ class GmailTextSender:
         msg["From"] = "me"
         msg["Subject"] = subject
         msg.set_content(body_text)
-
 
         # Optional attachment
         if attachment_path:

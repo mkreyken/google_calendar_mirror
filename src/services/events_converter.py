@@ -8,24 +8,24 @@ from src.api.calendar_source_info import CalendarSourceInfo
 from src.api.types import EventType, GoogleEventData, STATUS_OK, STATUS_CANCELLED, MappingEvent
 from src.clients.settings_on_disk import SETTINGS, GOOGLE_COLOR_AS_HEX
 from src.services.env import SENSITIVE_KEYWORDS
-from src.util.date_util import to_rfc3339, google_to_rfc3339
+from src.util.date_util import to_rfc3339
 from src.util.exceptions import InvalidDataError
 
 """ Google has fixed color ids, 11-20 = calendar, 1-10 = event """
 """ OLD OFF"""
 CALENDAR_TO_EVENT_COLOR_MAP = {
     "0": None,  # or omit colorId → use calendar color in UI
-    "1": "1",   # Lavender
-    "2": "2",   # Sage
-    "3": "3",   # Grape  # close
-    "4": "4",   # Flamingo #no matching cal
-    "5": "5",   # Banana
-    "6": "6",   # Tangerine # no matching cal
-    "7": "7",   # Peacock
-    "8": "8",   # Graphite
-    "9": "9",   # Blueberry
-    "10": "10", # Basil     #close
-    "11": "11", # Tomato
+    "1": "1",  # Lavender
+    "2": "2",  # Sage
+    "3": "3",  # Grape  # close
+    "4": "4",  # Flamingo #no matching cal
+    "5": "5",  # Banana
+    "6": "6",  # Tangerine # no matching cal
+    "7": "7",  # Peacock
+    "8": "8",  # Graphite
+    "9": "9",  # Blueberry
+    "10": "10",  # Basil     #close
+    "11": "11",  # Tomato
     "12": "5",  # Banana (calendar) → Banana (event)
     "13": "2",  # Sage (calendar) → Sage (event)
     "14": "7",  # Peacock (calendar) → Peacock (event)
@@ -34,10 +34,11 @@ CALENDAR_TO_EVENT_COLOR_MAP = {
     "17": "1",  # Lavender (calendar) → Lavender (event)
     "18": "3",  # Wisteria → Grape (closest purple)
     "19": "8",  # Graphite (calendar) → Graphite (event)
-    "20": "10", # Birch → Basil (closest green-ish neutral)
+    "20": "10",  # Birch → Basil (closest green-ish neutral)
 }
 
 logger = logging.getLogger(__name__)
+
 
 class EventConverter:
 
@@ -67,7 +68,7 @@ class EventConverter:
                 event,
                 summary="Private Event",
                 description="Private Event",
-                visibility = None
+                visibility=None
             )
         return event
 
@@ -84,7 +85,7 @@ class EventConverter:
             "sync.type": "event_mapping",
             "source.event_id": event.source_event_id,
             "source.calendar_id": event.source_calendar_id,
-            "source.updated_at" : event.updated_at,
+            "source.updated_at": event.updated_at,
             "lastSyncedAt": event.last_synced_at
         }
         # prefer the hex colors if they are present
@@ -141,9 +142,9 @@ class EventConverter:
         if is_from_mirror:
             extended = data.get("extendedProperties") or {}
             private = extended.get("private") or {}
-            source_event_id : str  = private.get("source.event_id", "")
-            source_calendar_id : str = private.get("source.calendar_id", "")
-            updated_at : str = private.get("source.updated_at","")
+            source_event_id: str = private.get("source.event_id", "")
+            source_calendar_id: str = private.get("source.calendar_id", "")
+            updated_at: str = private.get("source.updated_at", "")
             mirror_event_id = my_id
             if not source_event_id:
                 logger.error(f"Misaligned or bad data : {mirror_event_id}")
@@ -152,8 +153,7 @@ class EventConverter:
             source_event_id = my_id
             mirror_event_id = None
             source_calendar_id = cal.id
-            updated_at : str = data.get("updated") # the date is a simple date string
-
+            updated_at: str = data.get("updated")  # the date is a simple date string
 
         return EventType(
             status=status,
@@ -163,18 +163,17 @@ class EventConverter:
             start=data.get("start"),
             end=data.get("end"),
 
-
-            summary=data.get("summary",""),
-            description=data.get("description",""),
-            color_id=data.get("colorId","0"),
+            summary=data.get("summary", ""),
+            description=data.get("description", ""),
+            color_id=data.get("colorId", "0"),
             foreground_color=data.get("foregroundColor"),
             background_color=data.get("backgroundColor"),
             visibility=data.get("visibility"),
             location=data.get("location"),
             iCalUID=data.get("iCalUID"),
 
-            updated_at= updated_at,
-            last_synced_at=str(private.get("lastSyncedAt","")),
+            updated_at=updated_at,
+            last_synced_at=str(private.get("lastSyncedAt", "")),
 
         )
 
@@ -203,7 +202,7 @@ class EventConverter:
                 background_color=source_calendar.background_color,
                 last_synced_at=to_rfc3339(sync_time)
             )
-        else :
+        else:
             return replace(
                 event,
                 summary=new_summary,

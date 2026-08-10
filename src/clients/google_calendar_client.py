@@ -12,7 +12,7 @@ from google.auth.transport.requests import Request
 # noinspection PyPackageRequirements
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore[import-untyped]
-from googleapiclient.discovery import build # type: ignore[import-untyped]
+from googleapiclient.discovery import build  # type: ignore[import-untyped]
 
 from src.api.types import CalendarPageData, GoogleEventData, CalendarSourceInfo
 from src.api.types import EventType
@@ -40,9 +40,9 @@ class GoogleCalendarClient:
         return cast(
             InstalledAppFlow,
             InstalledAppFlow.from_client_secrets_file(
-            self.credentials_file,
+                self.credentials_file,
                 ALL_GOOGLE_AUTH_SCOPES,
-        ))
+            ))
 
     def _authenticate(self) -> Credentials:
         creds: Optional[Credentials] = None
@@ -87,14 +87,13 @@ class GoogleCalendarClient:
             page_token: Optional[str] = None,
             sync_token: Optional[str] = None,
             single_events: bool = True
-    ) -> CalendarPageData :
+    ) -> CalendarPageData:
 
         params: GoogleClientJsonType = {
             "calendarId": calendar_id,
             "maxResults": max_results,
             "singleEvents": single_events,
         }
-
 
         if page_token:
             params["pageToken"] = page_token

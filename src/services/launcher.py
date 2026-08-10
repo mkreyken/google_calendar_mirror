@@ -105,7 +105,7 @@ class StatusManager:
 class SyncManager:
     def __init__(self, status_manager: Optional[StatusManager] = None):
         self.status_manager: Optional[StatusManager] = status_manager
-        self.to_email :str = SETTINGS.get(EMAIL_TO_REPORT)
+        self.to_email: str = SETTINGS.get(EMAIL_TO_REPORT)
 
     def run_sync(self, kind: str) -> bool:
         app_logger.info(f"Starting {kind} sync...")
@@ -119,9 +119,10 @@ class SyncManager:
             app_logger.exception(f"{kind.capitalize()} sync failed.")
             success = False
 
-        if self.status_manager :
+        if self.status_manager:
             self.status_manager.update_status(kind, success)
         return success
+
 
 # --- Notifications ---
 

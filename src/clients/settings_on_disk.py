@@ -1,5 +1,5 @@
 import os
-from typing import Dict,Optional
+from typing import Dict, Optional
 
 from src.services.env import SETTINGS_ON_DISK_FILENAME
 from src.util.filesystem import get_data_location_as_path, load_json_file, save_json_file
@@ -10,8 +10,8 @@ EMAIL_TO_REPORT = "email_report_to"
 
 SettingsOnDisk = str | bool
 
-class Settings:
 
+class Settings:
     _instance = None
 
     def __new__(cls) -> Settings:
@@ -24,15 +24,15 @@ class Settings:
         if not hasattr(self, "settings"):
             self.settings = self.load_mirror_mapping()
 
-    def get(self, key:str) -> Optional[str|bool]:
+    def get(self, key: str) -> Optional[str | bool]:
         results = self.settings.get(key)
         if results is None:
             return self.default_values().get(key)
         return results
 
     @classmethod
-    def default_values(cls) ->Dict[str,SettingsOnDisk]:
-        values : Dict[str,SettingsOnDisk] = {
+    def default_values(cls) -> Dict[str, SettingsOnDisk]:
+        values: Dict[str, SettingsOnDisk] = {
             GOOGLE_COLOR_AS_HEX: False,
             IS_MASTER_SYNC_COMPUTER: True,
             EMAIL_TO_REPORT: "me"
@@ -55,6 +55,7 @@ class Settings:
             mappings[key] = v
 
         return mappings
+
 
 # start singletons.
 SETTINGS = Settings()

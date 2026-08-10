@@ -65,15 +65,15 @@ class SyncTokenStore:
     def clear(self, key: str) -> None:
         self.token_key_store.pop(key, None)
 
-    def get(self, key:str) -> TokenStoreValue|None:
+    def get(self, key: str) -> TokenStoreValue | None:
         return self.token_key_store.get(key, None)
 
-    def set(self, key:str, value: TokenStoreValue) -> None:
+    def set(self, key: str, value: TokenStoreValue) -> None:
         if value is None:
             raise ValueError("Value is null")
         self.token_key_store[key] = value
 
-    def delete(self, key:str) -> None:
+    def delete(self, key: str) -> None:
         self.token_key_store.pop(key, None)
 
     def keys(self) -> Any:

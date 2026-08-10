@@ -19,6 +19,7 @@ however we may need to delete in the mirror things in the date range to ensure t
 """
 import logging
 import os
+from collections import Counter
 from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -99,27 +100,39 @@ class MirrorCalendarManager:
                 else:
                     new_map = EventConverter.from_event_to_mapping(event, event.mirror_event_id)
                     existing_map: Optional[MappingEvent] = self.__match_event(event, self.mappings)
-
                     if existing_map:
                         #  a duplicate copy
                         bad_event = BadEvent(
                             mirror_event_id=event.mirror_event_id
                         )
                         self.bad_events.append(bad_event)
-                    elif is_audit:
-                        old_map: Optional[MappingEvent] = self.__match_event(event, old_mapping)
-                        if not old_map:
-                            logger.warning(f"missing {new_map}")
-                        elif not old_map == new_map:
-                            logger.warning(f"mismatched {old_map} and {new_map}")
-                        self.mappings[event.source_event_id] = new_map
                     else:
                         self.mappings[event.source_event_id] = new_map
 
             if not page_token:
                 break
         logger.info(f"Finished reading mirror cnt :{len(self.mappings)} bad : {len(self.bad_events or [])}")
+        if is_audit:
+            audit_results = self.compare_maps(old_mapping, self.mappings)
+            logger.info(f"Audit results: {audit_results}")
         return
+
+    @classmethod
+    def compare_maps(cls, old: dict[str, MappingEvent],
+                     new: dict[str, MappingEvent]):
+        counts = Counter()
+
+        old_keys = set(old)
+        new_keys = set(new)
+
+        counts["added"] += len(new_keys - old_keys)
+        counts["deleted"] += len(old_keys - new_keys)
+
+        # Must loop for updated vs unchanged
+        for key in old_keys & new_keys:
+            counts["updated" if old[key] != new[key] else "unchanged"] += 1
+
+        return counts
 
     @classmethod
     def __match_event(cls, event: EventType, mappings: Dict[str, MappingEvent]) -> MappingEvent | None:

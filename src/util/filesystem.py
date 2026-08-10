@@ -33,14 +33,18 @@ def get_credentials_filename() -> str:
 def get_data_directory() -> Path:
     return project_root() / DATA_DIRECTORY
 
+
 def get_log_directory() -> Path:
     return project_root() / LOG_DIRECTORY
+
 
 def get_data_location(location) -> str:
     return os.path.abspath(get_data_directory() / location)
 
+
 def get_data_location_as_path(location) -> Path:
     return get_data_directory() / location
+
 
 def load_json_file(path: Path) -> dict[str, Any]:
     if path.exists():

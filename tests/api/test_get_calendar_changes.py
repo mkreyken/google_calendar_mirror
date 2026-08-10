@@ -16,7 +16,7 @@ if __name__ == "__main__":
     print(mapped_calendars)
     mirror_calendar_id = calendar_mapper.get_mirror_calendar()
     for calendar in mapped_calendars.values():
-        data_manager = GoogleCalendarChangeReader(client,calendar,calendar_mapper)
+        data_manager = GoogleCalendarChangeReader(client, calendar, calendar_mapper)
         changes = data_manager.full_read()
         print(f"{calendar}: {changes}")
 """

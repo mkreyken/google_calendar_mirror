@@ -45,6 +45,5 @@ AUDIT_AND_UPDATE = "audit and update time window"
 AUDIT = "audit time window"
 INCREMENTAL_SYNC = "incremental"
 
-
 ALL_GOOGLE_AUTH_SCOPES = ["https://www.googleapis.com/auth/calendar",
-         "https://www.googleapis.com/auth/gmail.send"]
+                          "https://www.googleapis.com/auth/gmail.send"]

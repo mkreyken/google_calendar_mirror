@@ -11,7 +11,7 @@ client = GoogleCalendarClient()
 
 events = client.search_calendar_events(
     calendar_id="primary",
-    query="House Visit",          # free-text search
+    query="House Visit",  # free-text search
     time_min=time_min,
     time_max=time_max,
     single_events=True,
@@ -20,5 +20,4 @@ events = client.search_calendar_events(
 )
 
 for ev in events:
-
     print(f" {to_rfc3339(ev.start)}  {ev.summary}")

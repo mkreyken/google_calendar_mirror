@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from typing import Optional
 
 from src.api.calendar_source_info import CalendarMappingApi
@@ -11,9 +12,9 @@ from src.services.env import FULL_SYNC, INCREMENTAL_SYNC
 from src.util.date_util import min_mirror_date, max_mirror_date, should_run_full_sync, current_year_month_day
 from src.util.exceptions import GoogleInvalidSyncToken, InvalidDataError
 
-import logging
-
 logger = logging.getLogger(__name__)
+
+
 class GoogleCalendarChangeReader:
     def __init__(self, client: GoogleCalendarClient, source_calendar: CalendarSourceInfo,
                  calendar_mapper: CalendarMappingApi):
@@ -40,8 +41,8 @@ class GoogleCalendarChangeReader:
                 single_events=True,
                 calendar_id=self.source_calendar.id, time_min=time_min, time_max=time_max,
                 sync_token=sync_token, page_token=page_token, max_results=fetch_size)
-            logger.info(f"Reading Calendar cnt: {len(results.google_events)} sync: {results.next_sync_token or ''} page: {results.next_page_token or '' }")
-
+            logger.info(
+                f"Reading Calendar cnt: {len(results.google_events)} sync: {results.next_sync_token or ''} page: {results.next_page_token or ''}")
 
             for change in results.google_events:
                 changed.append(change)
@@ -60,7 +61,7 @@ class GoogleCalendarChangeReader:
     def full_read(self) -> CalendarChangeData:
         # This method exists to perform the initial or recovery sync when we do not
         # have a valid sync token, or when Google has invalidated the old one.
-        logger.info ("Full sync")
+        logger.info("Full sync")
         self.calendar_mapper.clear_sync_token(self.source_calendar.id)
 
         results = self._page_through(
@@ -77,7 +78,7 @@ class GoogleCalendarChangeReader:
             time_min: Optional[dt.datetime] = min_mirror_date(),
             time_max: Optional[dt.datetime] = max_mirror_date(),
     ) -> CalendarChangeData:
-        logger.info ("Windowed sync")
+        logger.info("Windowed sync")
         # This method exists to perform the initial or recovery sync when we do not
         # have a valid sync token, or when Google has invalidated the old one.
 
@@ -89,7 +90,7 @@ class GoogleCalendarChangeReader:
 
         return CalendarChangeData(self.source_calendar, FULL_SYNC, results.google_events, results.next_sync_token)
 
-    def next_read(self, force_full_sync: bool, is_windowed_read : bool) -> CalendarChangeData:
+    def next_read(self, force_full_sync: bool, is_windowed_read: bool) -> CalendarChangeData:
         # This method exists to fetch only changes since the last successful sync,
         # which is much cheaper than reloading the entire calendar.
         sync_token: TokenStoreValue | None = self.calendar_mapper.get_sync_token(self.source_calendar.id)
@@ -118,4 +119,5 @@ class GoogleCalendarChangeReader:
             else:
                 raise InvalidDataError("Invalid sync token when no sync token given") from e
 
-        return CalendarChangeData(self.source_calendar, INCREMENTAL_SYNC, results.google_events, results.next_sync_token)
+        return CalendarChangeData(self.source_calendar, INCREMENTAL_SYNC, results.google_events,
+                                  results.next_sync_token)
