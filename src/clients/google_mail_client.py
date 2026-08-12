@@ -22,6 +22,10 @@ class GmailTextSender:
     Handles OAuth, MIME construction, and Gmail API send calls.
     """
 
+    credentials_file: str
+    token_path: str
+    service: GoogleMailClientType
+
     def __init__(self,
                  credentials_file: str = get_credentials_filename(),
                  token_path: str = get_tokens_filename()):  # type: ignore[no-untyped-def]

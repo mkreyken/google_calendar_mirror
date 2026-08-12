@@ -1,3 +1,5 @@
+from typing import Optional
+
 from src.api.types import CalendarSourceInfo, AclInfo
 from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.mirror_key_store import SyncTokenStore, TokenStoreValue
@@ -15,15 +17,21 @@ def generate_location_short_code(name: str) -> str:
 
 
 class CalendarMappingApi:
+    client: GoogleCalendarClient
+    calendars: dict[str, CalendarSourceInfo]
+    mirror_calendar: Optional[CalendarSourceInfo]
+    keystore: SyncTokenStore
+    my_email: Optional[str]
+
     def __init__(
             self,
             client: GoogleCalendarClient,
             clear_database=False
     ):
         self.client = client
-        self.calendars: dict[str, CalendarSourceInfo] = {}
-        self.mirror_calendar: CalendarSourceInfo | None = None
-        self.keystore: SyncTokenStore = SyncTokenStore(CALENDAR_TOKEN_FILENAME, clear_database)
+        self.calendars = {}
+        self.mirror_calendar = None
+        self.keystore = SyncTokenStore(CALENDAR_TOKEN_FILENAME, clear_database)
         self.my_email = None
 
     def check_id_and_throw(self, calender_id: str) -> None:

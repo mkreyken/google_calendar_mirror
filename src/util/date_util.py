@@ -1,5 +1,4 @@
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Optional, Any
 from zoneinfo import ZoneInfo
 
@@ -92,32 +91,30 @@ def max_mirror_date() -> datetime:
     return add_months(MIRROR_MONTHS_MAX).astimezone()
 
 
-def current_year_month_day() -> int:
-    now = datetime.now()
-    return now.year * 10000 + now.month * 100 + now.day
+def current_sync_token_datestamp() -> datetime:
+    return datetime.now()
 
 
-def should_run_full_sync(last_sync_date: int) -> bool:
+from datetime import datetime
+
+def should_run_full_sync(last_sync_dt: datetime) -> bool:
     """
     Determines if a full sync is required based on date thresholds.
-    Assumes date format is YYYYMMDD (e.g., 20260722).
+    Replaces old YYYYMMDD integer logic with proper datetime handling.
     """
-    current_date = current_year_month_day()
 
-    # 1. Extract structural parts for comparison
-    current_month = current_date // 100
-    last_month = last_sync_date // 100
+    current_dt = current_sync_token_datestamp()   # must return datetime
 
-    # 2. Check for Month Rollover (Year changes automatically catch here too)
-    if current_month > last_month:
+    # 1. Month rollover (year rollover included automatically)
+    if (current_dt.year, current_dt.month) > (last_sync_dt.year, last_sync_dt.month):
         return True
 
-    # 3. Calculate calendar day difference within the same month
-    days_since_last_sync = current_date - last_sync_date
+    # 2. Day difference within same month
+    days_since_last_sync = (current_dt.date() - last_sync_dt.date()).days
 
     # "Every 5 days unless the last sync was 2 days ago"
-    # This translates to: trigger sync at >= 5 days, but block it if it's exactly 2 days ago.
     if days_since_last_sync >= 5 and days_since_last_sync != 2:
         return True
 
     return False
+

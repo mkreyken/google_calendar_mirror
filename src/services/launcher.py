@@ -1,20 +1,19 @@
-import json
 import logging
 import os
 import subprocess
 import sys
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List
 
 import pystray  # type: ignore[import-untyped]
 from PIL import Image, ImageDraw, ImageFont
 from pystray import Menu, MenuItem
 
-from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_REPORT
+from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS
 from src.services.controller import Controller
 from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
+from src.services.status_manager import StatusManager
 from src.util.filesystem import get_log_directory
 
 # --- Optional: Windows toast notifications via winrt ---
@@ -32,8 +31,6 @@ except Exception:
 # Icon is not exposed
 IconType = Any
 
-STATUS_FILE = get_log_directory() / "sync_status.json"
-
 APP_LOG_FILE = get_log_directory() / "app.log"
 
 app_handler = logging.FileHandler(APP_LOG_FILE, encoding="utf-8")
@@ -46,66 +43,17 @@ app_logger.addHandler(app_handler)
 app_logger.propagate = False
 
 
-class StatusManager:
-    def __init__(self, status_file: Path):
-        self.status_file = status_file
-
-    def load_status(self) -> dict:
-        if not self.status_file.exists():
-            return {
-                "last_full_sync": None,
-                "last_partial_sync": None,
-            }
-        with self.status_file.open("r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def save_status(self, status: dict) -> None:
-        with self.status_file.open("w", encoding="utf-8") as f:
-            json.dump(status, f, indent=2, ensure_ascii=False)
-
-    def update_status(self, kind: str, success: bool) -> None:
-        """
-        kind: 'full' or 'partial'
-        """
-        status = self.load_status()
-        now = datetime.now(timezone.utc).isoformat()
-        entry = {
-            "time": now,
-            "success": success,
-        }
-        key = f"last_{kind}_sync"
-        status[key] = entry
-        self.save_status(status)
-
-    def get_status_text(self) -> str:
-        status = self.load_status()
-        lines = []
-
-        def fmt_entry(entry, label) -> str:
-            if not entry:
-                return f"{label}: Never"
-            t_str = entry.get("time", "unknown")
-            ok = entry.get("success", False)
-            status_str = "OK" if ok else "Failed"
-            # noinspection PyBroadException
-            try:
-                dt = datetime.fromisoformat(t_str)
-                local_dt = dt.astimezone().strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                local_dt = t_str
-            return f"{label}: {local_dt} ({status_str})"
-
-        lines.append(fmt_entry(status.get("last_full_sync"), "Last full sync"))
-        lines.append(fmt_entry(status.get("last_partial_sync"), "Last partial sync"))
-        return "\n".join(lines)
-
-
 # --- Sync logic ---
 
 class SyncManager:
-    def __init__(self, status_manager: Optional[StatusManager] = None):
-        self.status_manager: Optional[StatusManager] = status_manager
-        self.to_email: str = SETTINGS.get(EMAIL_TO_REPORT)
+    to_email: str
+
+    def __init__(self):
+        val = SETTINGS.get(EMAIL_TO_LOGS)
+        if isinstance(val, str):
+            self.to_email = val
+        else:
+            raise ValueError("Email is not type str")
 
     def run_sync(self, kind: str) -> bool:
         app_logger.info(f"Starting {kind} sync...")
@@ -119,8 +67,6 @@ class SyncManager:
             app_logger.exception(f"{kind.capitalize()} sync failed.")
             success = False
 
-        if self.status_manager:
-            self.status_manager.update_status(kind, success)
         return success
 
 
@@ -313,8 +259,8 @@ class TrayController:
 def main() -> None:
     APP_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    status_manager = StatusManager(STATUS_FILE)
-    sync_manager = SyncManager(status_manager)
+    status_manager = StatusManager()
+    sync_manager = SyncManager()
     notification_manager = NotificationManager(APP_ID, use_toast=True)
 
     tray = TrayController(

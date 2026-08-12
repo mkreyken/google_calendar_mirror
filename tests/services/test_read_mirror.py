@@ -11,6 +11,6 @@ calendar_mapper = CalendarMappingApi(
 mapped_calendars = calendar_mapper.fetch_calendars()
 mirror_calendar_id = calendar_mapper.get_mirror_calendar()
 mirror = MirrorCalendarManager(client, mirror_calendar_id, calendar_mapper)
-mirror.read_mirror_and_report_errors()
+mirror.read_mirror_and_report_errors(True)
 print(f"Bad events = {mirror.bad_events or ''}")
 print(f"Mirror Events = {mirror.mappings}")

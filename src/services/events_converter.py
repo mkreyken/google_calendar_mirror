@@ -153,7 +153,7 @@ class EventConverter:
             source_event_id = my_id
             mirror_event_id = None
             source_calendar_id = cal.id
-            updated_at: str = data.get("updated")  # the date is a simple date string
+            updated_at= str(data.get("updated"))  # the date is a simple date string
 
         return EventType(
             status=status,

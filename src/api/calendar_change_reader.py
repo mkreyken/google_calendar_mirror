@@ -9,18 +9,22 @@ from src.api.types import CalendarSourceInfo, CalendarPageData, CalendarChangeDa
 from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.mirror_key_store import TokenStoreValue
 from src.services.env import FULL_SYNC, INCREMENTAL_SYNC
-from src.util.date_util import min_mirror_date, max_mirror_date, should_run_full_sync, current_year_month_day
+from src.util.date_util import min_mirror_date, max_mirror_date, should_run_full_sync, current_sync_token_datestamp
 from src.util.exceptions import GoogleInvalidSyncToken, InvalidDataError
 
 logger = logging.getLogger(__name__)
 
 
 class GoogleCalendarChangeReader:
+    client: GoogleCalendarClient
+    source_calendar: CalendarSourceInfo
+    calendar_mapper: CalendarMappingApi
+
     def __init__(self, client: GoogleCalendarClient, source_calendar: CalendarSourceInfo,
                  calendar_mapper: CalendarMappingApi):
         self.client = client
-        self.source_calendar: CalendarSourceInfo = source_calendar
-        self.calendar_mapper: CalendarMappingApi = calendar_mapper
+        self.source_calendar = source_calendar
+        self.calendar_mapper = calendar_mapper
 
     def _page_through(
             self,
@@ -68,7 +72,7 @@ class GoogleCalendarChangeReader:
             sync_token=None,
         )
         if results.next_sync_token:
-            value = TokenStoreValue(results.next_sync_token, current_year_month_day(), self.source_calendar.name)
+            value = TokenStoreValue(results.next_sync_token, current_sync_token_datestamp(), self.source_calendar.name)
             self.calendar_mapper.update_sync_token(self.source_calendar.id, value)
 
         return CalendarChangeData(self.source_calendar, FULL_SYNC, results.google_events, results.next_sync_token)
@@ -109,7 +113,8 @@ class GoogleCalendarChangeReader:
                 sync_token=sync_token.token
             )
             if results.next_sync_token:
-                value = TokenStoreValue(results.next_sync_token, current_year_month_day(), self.source_calendar.id)
+                value = TokenStoreValue(results.next_sync_token, current_sync_token_datestamp(),
+                                        self.source_calendar.name)
                 self.calendar_mapper.update_sync_token(self.source_calendar.id, value)
 
         except GoogleInvalidSyncToken as e:

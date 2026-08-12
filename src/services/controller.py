@@ -17,14 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 class Controller:
+    client: GoogleCalendarClient
+    calendar_mapper: CalendarMappingApi
+    mirror: Optional[MirrorCalendarManager]
+    kind: Optional[str]
+
     def __init__(self) -> None:  # type: ignore[misc]
 
-        self.client: GoogleCalendarClient = GoogleCalendarClient()
-        self.calendar_mapper: CalendarMappingApi = CalendarMappingApi(
-            self.client
-        )
-        self.mirror: Optional[MirrorCalendarManager] = None
-        self.kind: Optional[str] = None
+        self.client = GoogleCalendarClient()
+        self.calendar_mapper = CalendarMappingApi(self.client)
+        self.mirror = None
+        self.kind = None
 
     @property
     def is_full_sync(self) -> bool:
@@ -51,7 +54,7 @@ class Controller:
         time_min = min_mirror_date()
         time_max = max_mirror_date()
 
-        results = Counter()
+        results = Counter[str]()
 
         for evt in changes.changed_events:
             start_str = evt.data["start"]

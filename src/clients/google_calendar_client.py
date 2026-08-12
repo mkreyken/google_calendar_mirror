@@ -28,12 +28,17 @@ GoogleClientJsonType = Dict[str, Any]
 
 class GoogleCalendarClient:
 
+    credentials_file: str
+    token_filename: str
+    credentials: Optional[Credentials]
+    google_client_with_auth: Optional[GoogleCalendarClientType]
+
     def __init__(self,
                  credentials_file: str = get_credentials_filename(),
                  token_file: str = get_tokens_filename()):
         self.credentials_file = credentials_file
-        self._token_file = token_file
-        self._creds: Optional[Credentials] = None
+        self.token_filename = token_file
+        self.credentials: Optional[Credentials] = None
         self._google_client_With_auth: Optional[GoogleCalendarClientType] = None
 
     def _build_flow(self) -> InstalledAppFlow:
@@ -47,8 +52,8 @@ class GoogleCalendarClient:
     def _authenticate(self) -> Credentials:
         creds: Optional[Credentials] = None
 
-        if os.path.exists(self._token_file):
-            creds = Credentials.from_authorized_user_file(self._token_file, ALL_GOOGLE_AUTH_SCOPES)
+        if os.path.exists(self.token_filename):
+            creds = Credentials.from_authorized_user_file(self.token_filename, ALL_GOOGLE_AUTH_SCOPES)
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -56,8 +61,8 @@ class GoogleCalendarClient:
                     creds.refresh(Request())
                 except RefreshError:
                     creds = None
-                    if os.path.exists(self._token_file):
-                        os.remove(self._token_file)
+                    if os.path.exists(self.token_filename):
+                        os.remove(self.token_filename)
 
             if not creds:
                 flow = self._build_flow()
@@ -66,7 +71,7 @@ class GoogleCalendarClient:
             if not creds:
                 raise GoogleApiError("no Credentials")
 
-            with open(self._token_file, "w", encoding="utf-8") as token:
+            with open(self.token_filename, "w", encoding="utf-8") as token:
                 token.write(creds.to_json())
 
         return creds
@@ -74,8 +79,8 @@ class GoogleCalendarClient:
     @property
     def _google_client(self) -> GoogleCalendarClientType:
         if self._google_client_With_auth is None:
-            self._creds = self._authenticate()
-            self._google_client_With_auth = build("calendar", "v3", credentials=self._creds)
+            self.credentials = self._authenticate()
+            self._google_client_With_auth = build("calendar", "v3", credentials=self.credentials)
         return self._google_client_With_auth
 
     def list_events(

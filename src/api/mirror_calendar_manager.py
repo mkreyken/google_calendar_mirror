@@ -19,31 +19,39 @@ however we may need to delete in the mirror things in the date range to ensure t
 """
 import logging
 import os
+import zoneinfo
 from collections import Counter
 from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Dict, Tuple
 
 from src.api.calendar_source_info import CalendarMappingApi
-from src.api.types import EventType, MappingEvent, STATUS_OK, STATUS_CANCELLED, STATUS_BAD, STATUS_DELETED, BadEvent, \
+from src.api.types import EventType, MappingEvent, STATUS_OK, STATUS_CANCELLED, STATUS_DELETED, BadEvent, \
     GoogleEventData, CalendarPageData, CalendarSourceInfo
 from src.clients.google_calendar_client import GoogleCalendarClient
+from src.clients.settings_on_disk import SETTINGS, MY_TIMEZONE
 from src.services.events_converter import EventConverter
 from src.util.exceptions import InvalidDataError
-from src.util.filesystem import save_json_file, load_json_file, get_data_location_as_path
+from src.util.filesystem import save_json_file, load_json_file, get_data_location_as_path, get_data_directory
 
 logger = logging.getLogger(__name__)
 
 
 # noinspection PyUnresolvedReferences
 class MirrorCalendarManager:
+    bad_events: Optional[list[BadEvent]]
+    client: GoogleCalendarClient
+    mirror_calendar: CalendarSourceInfo
+    mappings: dict[str, MappingEvent]
+    calendars: CalendarMappingApi
 
     def __init__(self, client: GoogleCalendarClient, mirror_calendar: CalendarSourceInfo,
                  calendars: CalendarMappingApi):
-        self.bad_events: Optional[list[BadEvent]] = None
-        self.client: GoogleCalendarClient = client
-        self.mirror_calendar: CalendarSourceInfo = mirror_calendar
-        self.mappings: dict[str, MappingEvent] = {}
+        self.bad_events = None
+        self.client = client
+        self.mirror_calendar = mirror_calendar
+        self.mappings = {}
         self.calendars = calendars
 
     def read_mirror_and_report_errors(self, is_audit: bool) -> None:
@@ -120,7 +128,7 @@ class MirrorCalendarManager:
     @classmethod
     def compare_maps(cls, old: dict[str, MappingEvent],
                      new: dict[str, MappingEvent]):
-        counts = Counter()
+        counts = Counter[str]()
 
         old_keys = set(old)
         new_keys = set(new)
@@ -144,7 +152,7 @@ class MirrorCalendarManager:
             return None
         if mapping.source_calendar_id == event.source_calendar_id and event.status == STATUS_OK:
             return mapping
-        mapping.status = STATUS_BAD
+        logger.warning(f"--- Found an invalid match {event.source_event_id}")
         return None
 
     def audit(self, event: EventType, and_update: bool = True, always_update: bool = True) -> str:
@@ -314,9 +322,118 @@ class MirrorCalendarManager:
             self.mappings = {}
             return False
 
+        self.mappings = self._load_mirror_mappings(filename)
+        return True
+
+    @classmethod
+    def _load_mirror_mappings(cls, filename: Path) -> dict[str, MappingEvent]:
+
         raw = load_json_file(filename)
-        self.mappings = {
+        return {
             key: MappingEvent(**value)
             for key, value in raw.items()
         }
-        return True
+
+    @classmethod
+    def find_latest_mirror_filename(cls) -> Path | None:
+        data_dir = get_data_directory()
+
+        # Search mode: find any matching mapping file
+        candidates = list(data_dir.glob("mirror_*_mapping.json"))
+
+        if not candidates:
+            return None
+        if len(candidates) > 1:
+            logger.warning("multiple mirror files")
+            # If multiple exist, pick the newest
+            candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return candidates[0]
+
+    @classmethod
+    def summarize_mapping_events(cls) -> List[str]:
+        my_timezone = SETTINGS.get(MY_TIMEZONE)
+        if not isinstance(my_timezone, str):
+            raise ValueError("timezone is not defined")
+
+        status_counts = Counter[str]()
+        updated_daily = Counter[str]()
+        synced_daily = Counter[str]()
+        updated_weekly = Counter[Tuple[str, str]]()
+        synced_weekly = Counter[Tuple[str, str]]()
+
+        filename = cls.find_latest_mirror_filename()
+        if not filename:
+            return ["No File"]
+
+        events = cls._load_mirror_mappings(filename)
+
+        tz = zoneinfo.ZoneInfo(my_timezone)
+        now = datetime.now(tz=tz)
+        one_week_ago = now - timedelta(days=7)
+
+        def parse(ts: str) -> datetime:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(tz)
+
+        def week_range(dt: datetime) -> Tuple[str, str]:
+            d = dt.date()
+            start_d = d - timedelta(days=d.weekday())  # Monday
+            end_d = start_d + timedelta(days=6)  # Sunday
+            return str(start_d), str(end_d)
+
+        # Build the last 7 calendar days in local timezone
+        last_7_days = []
+        for i in range(7):
+            d = (now - timedelta(days=i)).date()
+            last_7_days.append(str(d))
+
+        last_7_days.sort()  # oldest → newest
+
+        for ev in events.values():
+            status_counts[ev.status] += 1
+
+            updated_dt = parse(ev.updated_at)
+            synced_dt = parse(ev.last_synced_at)
+
+            updated_day = str(updated_dt.date())
+            synced_day = str(synced_dt.date())
+
+            # Daily (last 7 days)
+            if updated_dt >= one_week_ago:
+                updated_daily[updated_day] += 1
+            if synced_dt >= one_week_ago:
+                synced_daily[synced_day] += 1
+
+            # Weekly (use date ranges instead of ISO week numbers)
+            updated_week = week_range(updated_dt)
+            synced_week = week_range(synced_dt)
+
+            updated_weekly[updated_week] += 1
+            synced_weekly[synced_week] += 1
+
+        # Build output
+        lines = ["=== Status Totals ==="]
+        for status, count in status_counts.items():
+            lines.append(f"{status}: {count}")
+
+        lines.append("")
+        lines.append("=== Updated_at Daily (Last 7 Days) ===")
+        for day in last_7_days:
+            count = synced_daily.get(day, 0)
+            lines.append(f"{day}: {count}")
+
+        lines.append("")
+        lines.append("=== Last_synced_at Daily (Last 7 Days) ===")
+        for day, count in sorted(synced_daily.items()):
+            lines.append(f"{day}: {count}")
+
+        lines.append("")
+        lines.append("=== Updated_at Weekly Totals ===")
+        for (start, end), count in sorted(updated_weekly.items()):
+            lines.append(f"{start} → {end}: {count}")
+
+        lines.append("")
+        lines.append("=== Last_synced_at Weekly Totals ===")
+        for (start, end), count in sorted(synced_weekly.items()):
+            lines.append(f"{start} → {end}: {count}")
+
+        return lines

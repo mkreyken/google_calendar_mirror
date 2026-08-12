@@ -34,6 +34,10 @@ class ImageAgent:
 
     MIN_BYTES = 40 * 1024  # Skip images smaller than 40 KB
 
+    credentials_file: str
+    token_path: str
+    service: GoogleCalendarClientType
+
     def __init__(self,
                  credentials_file: str = get_credentials_filename(),
                  token_path: str = get_tokens_filename()):  # type: ignore[no-untyped-def]
