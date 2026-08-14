@@ -13,7 +13,7 @@ from pystray import Menu, MenuItem
 from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS
 from src.services.controller import Controller
 from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
-from src.services.status_manager import StatusManager
+from src.reporter.status_manager import StatusManager
 from src.util.filesystem import get_log_directory
 
 # --- Optional: Windows toast notifications via winrt ---

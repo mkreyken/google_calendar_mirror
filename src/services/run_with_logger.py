@@ -3,10 +3,8 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Callable
 
-from src.clients.google_mail_client import GmailTextSender
 from src.util.filesystem import get_log_directory
 
 JobFunc = Callable[[], None]
@@ -114,7 +112,7 @@ def configure_logging() -> LoggerData:
     )
 
 
-def run_job_with_email_report(function: JobFunc, to_email: str) -> None:
+def run_job_and_capture_log(function: JobFunc) -> str:
     # Close handlers from a previous configuration before renaming the file.
     close_existing_logging()
 
@@ -143,12 +141,4 @@ def run_job_with_email_report(function: JobFunc, to_email: str) -> None:
         close_existing_logging()
         logger_data.output_buffer.close()
 
-    subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
-
-    if to_email:
-        sender = GmailTextSender()
-        sender.send_text(
-            to=to_email,
-            subject=subject,
-            body=log_text,
-        )
+    return log_text

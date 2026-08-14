@@ -125,17 +125,20 @@ class EventConverter:
         )
 
     @classmethod
+    def is_google_event_cancel(cls, evt: GoogleEventData):
+        status_raw = evt.data.get("status")
+        return status_raw == "cancelled"
+
+    @classmethod
     def to_event_data(cls, evt: GoogleEventData, cal: CalendarSourceInfo, is_from_mirror: bool = False) -> EventType:
         """ None is not a valid value in the Google data """
 
-        data = evt.data
-        status_raw = data.get("status")
-
-        if status_raw == "cancelled":
+        if cls.is_google_event_cancel(evt):
             status = STATUS_CANCELLED
         else:
             status = STATUS_OK
 
+        data = evt.data
         my_id = data.get("id")
         if not my_id: raise InvalidDataError("no id on fetch")
 
@@ -153,7 +156,7 @@ class EventConverter:
             source_event_id = my_id
             mirror_event_id = None
             source_calendar_id = cal.id
-            updated_at= str(data.get("updated"))  # the date is a simple date string
+            updated_at = str(data.get("updated"))  # the date is a simple date string
 
         return EventType(
             status=status,

@@ -1,0 +1,32 @@
+from datetime import datetime
+
+from src.clients.google_mail_client import GmailTextSender
+from src.clients.settings_on_disk import EMAIL_TO_LOGS, SETTINGS
+from src.reporter.status_manager import StatusManager
+from src.services.controller import Controller
+from src.services.env import AUDIT
+
+
+def remote_audit() -> None:
+    val = SETTINGS.get(EMAIL_TO_LOGS)
+    if isinstance(val, str):
+        to_email = val
+    else:
+        raise ValueError("Email is not type str")
+    controller = Controller()
+    status_manager = StatusManager()
+
+    controller_text = controller.run_with_logger_output(AUDIT)
+
+    status_text = status_manager.get_status_text()
+
+    body_text = status_text + "\n" + controller_text
+
+    subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
+
+    sender = GmailTextSender()
+    sender.send_text(
+        to=to_email,
+        subject=subject,
+        body=body_text,
+    )

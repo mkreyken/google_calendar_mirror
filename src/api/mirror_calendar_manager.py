@@ -32,6 +32,7 @@ from src.api.types import EventType, MappingEvent, STATUS_OK, STATUS_CANCELLED, 
 from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.settings_on_disk import SETTINGS, MY_TIMEZONE
 from src.services.events_converter import EventConverter
+from src.util.date_util import max_mirror_date,min_mirror_date
 from src.util.exceptions import InvalidDataError
 from src.util.filesystem import save_json_file, load_json_file, get_data_location_as_path, get_data_directory
 
@@ -64,8 +65,8 @@ class MirrorCalendarManager:
         # filtered does not allow for sync_token
         # Mirror is always window_synced, it has a local db instead of "incremental"
         # Rolling window: 2 months back, 18 months forward
-        window_start = now - timedelta(days=60)
-        window_end = now + timedelta(days=540)
+        window_start = min_mirror_date()
+        window_end = max_mirror_date()
         sync_token = None
 
         old_mapping: Dict[str, MappingEvent] = self.mappings
@@ -122,7 +123,7 @@ class MirrorCalendarManager:
         logger.info(f"Finished reading mirror cnt :{len(self.mappings)} bad : {len(self.bad_events or [])}")
         if is_audit:
             audit_results = self.compare_maps(old_mapping, self.mappings)
-            logger.info(f"Audit results: {audit_results}")
+            logger.info(f"Audit results: {dict(audit_results)}")
         return
 
     @classmethod
@@ -156,7 +157,27 @@ class MirrorCalendarManager:
         return None
 
     def audit(self, event: EventType, and_update: bool = True, always_update: bool = True) -> str:
+
         mapped_event = self.__match_event(event, self.mappings)
+
+        if event.status == STATUS_CANCELLED:
+
+            # DELETE
+            if mapped_event:
+                if not always_update:
+                    return "No_action"
+
+                if not and_update:
+                    return "difference:del"
+
+                self.client.delete_event(
+                    calendar_id=self.mirror_calendar.id,
+                    event_id=mapped_event.mirror_event_id
+                )
+            else:
+                return "deleted:NF"
+            self.__update_sync_data(event, mapped_event.mirror_event_id, deleted=True)
+            return "deleted"
 
         if not mapped_event:
             logger.info(f"Missing  {event.source_event_id}")
@@ -167,18 +188,6 @@ class MirrorCalendarManager:
 
         if not and_update:
             return "difference"
-
-        if event.status == STATUS_CANCELLED:
-            # DELETE
-            if mapped_event:
-                self.client.delete_event(
-                    calendar_id=self.mirror_calendar.id,
-                    event_id=mapped_event.mirror_event_id
-                )
-            else:
-                return "deleted:NF"
-            self.__update_sync_data(event, mapped_event.mirror_event_id, deleted=True)
-            return "deleted"
 
         if mapped_event:
             # UPDATE
@@ -375,8 +384,8 @@ class MirrorCalendarManager:
             return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(tz)
 
         def week_range(dt: datetime) -> Tuple[str, str]:
-            d = dt.date()
-            start_d = d - timedelta(days=d.weekday())  # Monday
+            the_date = dt.date()
+            start_d = the_date - timedelta(days=the_date.weekday())  # Monday
             end_d = start_d + timedelta(days=6)  # Sunday
             return str(start_d), str(end_d)
 
