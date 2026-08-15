@@ -8,7 +8,7 @@ from src.api.calendar_source_info import CalendarSourceInfo
 from src.api.types import EventType, GoogleEventData, STATUS_OK, STATUS_CANCELLED, MappingEvent
 from src.clients.settings_on_disk import SETTINGS, GOOGLE_COLOR_AS_HEX
 from src.services.env import SENSITIVE_KEYWORDS
-from src.util.date_util import to_rfc3339
+from src.util.date_util import to_rfc3339, google_to_rfc3339
 from src.util.exceptions import InvalidDataError
 
 """ Google has fixed color ids, 11-20 = calendar, 1-10 = event """
@@ -82,7 +82,6 @@ class EventConverter:
             "end": event.end,
         }
         private: Dict[str, Any] = {
-            "sync.type": "event_mapping",
             "source.event_id": event.source_event_id,
             "source.calendar_id": event.source_calendar_id,
             "source.updated_at": event.updated_at,
@@ -116,12 +115,13 @@ class EventConverter:
         if not mirror_event_id: raise InvalidDataError("No mirror id on conversion")
 
         return MappingEvent(
-            status=STATUS_OK,
             mirror_event_id=mirror_event_id,
             source_calendar_id=evt.source_calendar_id,
             source_event_id=evt.source_event_id,
             last_synced_at=evt.last_synced_at,
-            updated_at=evt.updated_at
+            updated_at=evt.updated_at,
+            start=google_to_rfc3339(evt.start),
+            end=google_to_rfc3339(evt.end)
         )
 
     @classmethod
@@ -148,15 +148,16 @@ class EventConverter:
             source_event_id: str = private.get("source.event_id", "")
             source_calendar_id: str = private.get("source.calendar_id", "")
             updated_at: str = private.get("source.updated_at", "")
+            last_synced_at : str = private.get("lastSyncedAt", "")
             mirror_event_id = my_id
             if not source_event_id:
                 logger.error(f"Misaligned or bad data : {mirror_event_id}")
         else:
-            private = {}
             source_event_id = my_id
-            mirror_event_id = None
             source_calendar_id = cal.id
-            updated_at = str(data.get("updated"))  # the date is a simple date string
+            updated_at = str(data.get("updated",""))  # the date is a simple date string
+            last_synced_at = ""
+            mirror_event_id = None
 
         return EventType(
             status=status,
@@ -176,7 +177,7 @@ class EventConverter:
             iCalUID=data.get("iCalUID"),
 
             updated_at=updated_at,
-            last_synced_at=str(private.get("lastSyncedAt", "")),
+            last_synced_at=last_synced_at,
 
         )
 

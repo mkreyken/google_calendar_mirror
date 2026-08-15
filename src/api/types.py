@@ -56,11 +56,13 @@ class MappingEvent:
     source_calendar_id: str
     source_event_id: str
     last_synced_at: str
-    updated_at: str
-    status: str
+    updated_at: str  # has changed
+    start:str # for conflicts
+    end:str  # for conflicts
+    location:Optional[str] = None # for sub location identification
 
 
-@dataclass
+@dataclass(frozen=True)
 class BadEvent:
     mirror_event_id: str
 

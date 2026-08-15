@@ -98,6 +98,7 @@ class Controller:
         if not self.mirror: raise RuntimeError("Mirror not initialized")
         self.mirror.delete_bad_events()
 
+
     def __run(self) -> None:
         self.calendar_mapper.fetch_calendars()
         mirror_calendar = self.calendar_mapper.get_mirror_calendar()

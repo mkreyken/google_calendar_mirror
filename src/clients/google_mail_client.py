@@ -31,7 +31,7 @@ class GmailTextSender:
                  token_path: str = get_tokens_filename()):  # type: ignore[no-untyped-def]
         self.credentials_file = credentials_file
         self.token_path = token_path
-        self.service = self._authorize()
+        self.service = self._authenticate()
 
     def _build_flow(self) -> InstalledAppFlow:
         return cast(
@@ -41,7 +41,7 @@ class GmailTextSender:
                 ALL_GOOGLE_AUTH_SCOPES,
             ))
 
-    def _authorize(self) -> GoogleMailClientType:
+    def _authenticate(self) -> GoogleMailClientType:
         """
         Perform OAuth desktop flow and return an authenticated Gmail API service.
         Deterministic: token.json is reused until invalid.

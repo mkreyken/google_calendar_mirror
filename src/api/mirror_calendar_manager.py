@@ -22,17 +22,17 @@ import os
 import zoneinfo
 from collections import Counter
 from dataclasses import asdict, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
 from src.api.calendar_source_info import CalendarMappingApi
-from src.api.types import EventType, MappingEvent, STATUS_OK, STATUS_CANCELLED, STATUS_DELETED, BadEvent, \
+from src.api.types import EventType, MappingEvent, STATUS_CANCELLED, STATUS_DELETED, BadEvent, \
     GoogleEventData, CalendarPageData, CalendarSourceInfo
 from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.settings_on_disk import SETTINGS, MY_TIMEZONE
 from src.services.events_converter import EventConverter
-from src.util.date_util import max_mirror_date,min_mirror_date
+from src.util.date_util import max_mirror_date, min_mirror_date
 from src.util.exceptions import InvalidDataError
 from src.util.filesystem import save_json_file, load_json_file, get_data_location_as_path, get_data_directory
 
@@ -55,12 +55,19 @@ class MirrorCalendarManager:
         self.mappings = {}
         self.calendars = calendars
 
+    @classmethod
+    def mapping_file(cls) -> Dict[str, MappingEvent] |None:
+        filename = cls.find_latest_mirror_filename()
+        if not filename:
+            return None
+
+        return cls._load_mirror_mappings(filename)
+
     def read_mirror_and_report_errors(self, is_audit: bool) -> None:
         """
         Rebuild the sync mapping database by scanning the mirror calendar.
         Only events inside the rolling window are considered.
         """
-        now = datetime.now(timezone.utc)
 
         # filtered does not allow for sync_token
         # Mirror is always window_synced, it has a local db instead of "incremental"
@@ -151,7 +158,7 @@ class MirrorCalendarManager:
         mapping = mappings.get(event.source_event_id)
         if not mapping:
             return None
-        if mapping.source_calendar_id == event.source_calendar_id and event.status == STATUS_OK:
+        if mapping.source_calendar_id == event.source_calendar_id:
             return mapping
         logger.warning(f"--- Found an invalid match {event.source_event_id}")
         return None
@@ -370,11 +377,9 @@ class MirrorCalendarManager:
         updated_weekly = Counter[Tuple[str, str]]()
         synced_weekly = Counter[Tuple[str, str]]()
 
-        filename = cls.find_latest_mirror_filename()
-        if not filename:
+        events = cls.mapping_file()
+        if not events:
             return ["No File"]
-
-        events = cls._load_mirror_mappings(filename)
 
         tz = zoneinfo.ZoneInfo(my_timezone)
         now = datetime.now(tz=tz)
@@ -398,7 +403,6 @@ class MirrorCalendarManager:
         last_7_days.sort()  # oldest → newest
 
         for ev in events.values():
-            status_counts[ev.status] += 1
 
             updated_dt = parse(ev.updated_at)
             synced_dt = parse(ev.last_synced_at)

@@ -3,6 +3,10 @@
 * Ensure sharing is not enabled on the venue calendars
 * Run in the tray so it can be disabled, and can run reports
 
+# Timezonss:
+* Recurring events shift with the timezone as it moves along, so using single_events, and including timezone in the computation,
+* ensures no issues
+
 # Operation
 * The Policies of the Organization in Google, is not to allow users to publish primary calendars Visibly externally, but secondaries can be shared externally.
 * This will hide data from the venue calendars to the shared mirror, it will also ensure that the venues aer not shared.

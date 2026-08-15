@@ -2,7 +2,7 @@ import atexit
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from src.util.filesystem import get_data_location, save_json_file, load_json_file
 
@@ -108,8 +108,8 @@ class SyncTokenStore:
     def delete(self, key: str) -> None:
         self.token_key_store.pop(key, None)
 
-    def keys(self) -> Any:
-        return self.token_key_store.keys()
+    def items(self) -> Dict[str, TokenStoreValue]:
+        return self.token_key_store
 
     def __contains__(self, key) -> bool:
         return key in self.token_key_store

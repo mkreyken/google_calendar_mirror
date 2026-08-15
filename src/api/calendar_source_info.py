@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict
 
 from src.api.types import CalendarSourceInfo, AclInfo
 from src.clients.google_calendar_client import GoogleCalendarClient
@@ -33,6 +33,12 @@ class CalendarMappingApi:
         self.mirror_calendar = None
         self.keystore = SyncTokenStore(CALENDAR_TOKEN_FILENAME, clear_database)
         self.my_email = None
+
+    @classmethod
+    def read_calendar_sources(cls) -> Dict[str,TokenStoreValue] :
+        token_store = SyncTokenStore(CALENDAR_TOKEN_FILENAME, False)
+        return token_store.items()
+
 
     def check_id_and_throw(self, calender_id: str) -> None:
         if not self.is_valid_calendar_id(calender_id):

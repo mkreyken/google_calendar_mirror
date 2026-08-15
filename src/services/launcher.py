@@ -11,9 +11,9 @@ from PIL import Image, ImageDraw, ImageFont
 from pystray import Menu, MenuItem
 
 from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS
+from src.reporter.status_manager import StatusManager
 from src.services.controller import Controller
 from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
-from src.reporter.status_manager import StatusManager
 from src.util.filesystem import get_log_directory
 
 # --- Optional: Windows toast notifications via winrt ---
@@ -214,9 +214,12 @@ class TrayController:
             )]
 
         if SETTINGS.get(IS_MASTER_SYNC_COMPUTER):
-            menu_def.append(pystray.MenuItem(
-                "Sync now (full)",
-                self.on_sync_full))
+            # if there are tokens' use them, a audit and fix is all that is needed otherwise
+            # the only reason for a full sync is a buggy program, or data changes in the private,
+            # which should be done with the developer scripts
+            #menu_def.append(pystray.MenuItem(
+            #    "Sync now (full)",
+            #    self.on_sync_full))
             menu_def.append(pystray.MenuItem(
                 "Sync now (incremental)",
                 self.on_sync_partial))

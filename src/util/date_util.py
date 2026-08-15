@@ -50,7 +50,7 @@ def to_rfc3339(dt: Optional[datetime]) -> str:
     return dt.isoformat().replace("+00:00", "Z")
 
 
-def from_rfc3339(value: str) -> Optional[datetime]:
+def from_rfc3339(value: str) -> datetime:
     """Convert an RFC3339 timestamp back into a timezone-aware datetime."""
 
     # Normalize Z → +00:00 so datetime.fromisoformat can parse it
