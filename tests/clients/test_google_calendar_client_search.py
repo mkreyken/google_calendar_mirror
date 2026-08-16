@@ -14,8 +14,6 @@ events = client.search_calendar_events(
     query="House Visit",  # free-text search
     time_min=time_min,
     time_max=time_max,
-    single_events=True,
-    order_by="startTime",
     max_results=2500,
 )
 

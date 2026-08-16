@@ -45,7 +45,7 @@ class GoogleCalendarChangeReader:
                 single_events=True,
                 calendar_id=self.source_calendar.id, time_min=time_min, time_max=time_max,
                 sync_token=sync_token, page_token=page_token, max_results=fetch_size)
-            logger.info(
+            logger.debug(
                 f"Reading Calendar cnt: {len(results.google_events)} sync: {results.next_sync_token or ''} page: {results.next_page_token or ''}")
 
             for change in results.google_events:
@@ -58,14 +58,14 @@ class GoogleCalendarChangeReader:
             next_sync_token = results.next_sync_token
             break
 
-        logger.info(f"Completed Reading Calendar cnt :{len(changed)} sync: {next_sync_token or ''}")
+        logger.debug(f"Completed Reading Calendar cnt :{len(changed)} sync: {next_sync_token or ''}")
 
         return CalendarPageData(changed, next_sync_token=next_sync_token, next_page_token=None)
 
     def full_read(self) -> CalendarChangeData:
         # This method exists to perform the initial or recovery sync when we do not
         # have a valid sync token, or when Google has invalidated the old one.
-        logger.info("Full sync")
+        logger.debug("Full sync")
         self.calendar_mapper.clear_sync_token(self.source_calendar.id)
 
         results = self._page_through(
@@ -82,7 +82,7 @@ class GoogleCalendarChangeReader:
             time_min: Optional[dt.datetime] = min_mirror_date(),
             time_max: Optional[dt.datetime] = max_mirror_date(),
     ) -> CalendarChangeData:
-        logger.info("Windowed sync")
+        logger.debug("Windowed sync")
         # This method exists to perform the initial or recovery sync when we do not
         # have a valid sync token, or when Google has invalidated the old one.
 
@@ -106,7 +106,7 @@ class GoogleCalendarChangeReader:
         if not sync_token or should_run_full_sync(sync_token.date_stamp) or force_full_sync:
             return self.full_read()
 
-        logger.info("Incremental sync")
+        logger.debug("Incremental sync")
         # do sync from last sync up only
         try:
             results = self._page_through(

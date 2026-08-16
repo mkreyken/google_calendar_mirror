@@ -115,8 +115,8 @@ class ImageAgent:
         processed_ids = self.load_json_set(self.PROCESSED_FILE)
         image_hashes = self.load_json_set(self.HASH_FILE)
 
-        logger.info(f"Loaded {len(processed_ids)} processed emails")
-        logger.info(f"Loaded {len(image_hashes)} known image hashes")
+        logger.debug(f"Loaded {len(processed_ids)} processed emails")
+        logger.debug(f"Loaded {len(image_hashes)} known image hashes")
 
         success_label_id = self.get_or_create_label(self.SUCCESS_LABEL)
         fail_label_id = self.get_or_create_label(self.FAIL_LABEL)
@@ -125,7 +125,7 @@ class ImageAgent:
         results = self.service.users().messages().list(userId="me", q=query).execute()
         messages = results.get("messages", [])
 
-        logger.info(f"Found {len(messages)} total emails with photo attachments")
+        logger.debug(f"Found {len(messages)} total emails with photo attachments")
 
         for msg in messages:
             msg_id = msg["id"]
@@ -133,7 +133,7 @@ class ImageAgent:
             if msg_id in processed_ids:
                 continue
 
-            logger.info(f"Processing email {msg_id}")
+            logger.debug(f"Processing email {msg_id}")
 
             try:
                 message = self.service.users().messages().get(userId="me", id=msg_id).execute()
@@ -162,13 +162,13 @@ class ImageAgent:
 
                     # Skip tiny images (logos, icons)
                     if len(data) < self.MIN_BYTES:
-                        logger.info(f"Skipping tiny image {filename} ({len(data)} bytes)")
+                        logger.debug(f"Skipping tiny image {filename} ({len(data)} bytes)")
                         continue
 
                     # Hash dedupe
                     file_hash = self.sha256_bytes(data)
                     if file_hash in image_hashes:
-                        logger.info(f"Skipping duplicate image {filename}")
+                        logger.debug(f"Skipping duplicate image {filename}")
                         continue
 
                     # Save image
@@ -176,7 +176,7 @@ class ImageAgent:
                     with open(filepath, "wb") as f:
                         f.write(data)
 
-                    logger.info(f"Saved: {filepath}")
+                    logger.debug(f"Saved: {filepath}")
 
                     image_hashes.add(file_hash)
                     self.save_json_set(self.HASH_FILE, image_hashes)
@@ -186,10 +186,10 @@ class ImageAgent:
                 # Label success or failure
                 if downloaded_any:
                     self.apply_label(msg_id, success_label_id)
-                    logger.info(f"Labeled email {msg_id} as {self.SUCCESS_LABEL}")
+                    logger.debug(f"Labeled email {msg_id} as {self.SUCCESS_LABEL}")
                 else:
                     self.apply_label(msg_id, fail_label_id)
-                    logger.info(f"Labeled email {msg_id} as {self.FAIL_LABEL}")
+                    logger.debug(f"Labeled email {msg_id} as {self.FAIL_LABEL}")
 
             except Exception as e:
                 logger.info(f"Error processing {msg_id}: {e}")
@@ -198,4 +198,4 @@ class ImageAgent:
             processed_ids.add(msg_id)
             self.save_json_set(self.PROCESSED_FILE, processed_ids)
 
-        logger.info("Done. All new photos processed.")
+        logger.debug("Done. All new photos processed.")

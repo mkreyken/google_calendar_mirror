@@ -122,7 +122,7 @@ def run_job_and_capture_log(function: JobFunc) -> str:
     logger_data: LoggerData = configure_logging()
     logger = logger_data.logger
 
-    logger.info("Job started")
+    logger.debug("Job started")
 
     # noinspection broad-exception
     try:

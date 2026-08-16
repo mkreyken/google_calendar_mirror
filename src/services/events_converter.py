@@ -1,5 +1,6 @@
 # Keywords that trigger sanitization (case-insensitive)
 import logging
+import re
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
@@ -39,6 +40,7 @@ CALENDAR_TO_EVENT_COLOR_MAP = {
 
 logger = logging.getLogger(__name__)
 
+RECURRING_TAIL = re.compile(r"_\d{8}T\d{6}Z$")
 
 class EventConverter:
 
@@ -109,6 +111,16 @@ class EventConverter:
 
         return GoogleEventData(data)
 
+
+    @classmethod
+    def has_recurring_tail(cls, event_id: str) -> bool:
+
+        """
+        Returns True if the event_id contains the recurring-instance tail
+        that Google Calendar generates when singleEvents=True.
+        """
+        return bool(RECURRING_TAIL.search(event_id))
+
     @classmethod
     def from_event_to_mapping(cls, evt: EventType, mirror_event_id) -> MappingEvent:
         # because the event has no id on a creation, we pass in the event and the mirror_id
@@ -130,7 +142,7 @@ class EventConverter:
         return status_raw == "cancelled"
 
     @classmethod
-    def to_event_data(cls, evt: GoogleEventData, cal: CalendarSourceInfo, is_from_mirror: bool = False) -> EventType:
+    def to_event_data(cls, evt: GoogleEventData, cal_id: str, is_from_mirror: bool = False) -> EventType:
         """ None is not a valid value in the Google data """
 
         if cls.is_google_event_cancel(evt):
@@ -148,16 +160,18 @@ class EventConverter:
             source_event_id: str = private.get("source.event_id", "")
             source_calendar_id: str = private.get("source.calendar_id", "")
             updated_at: str = private.get("source.updated_at", "")
-            last_synced_at : str = private.get("lastSyncedAt", "")
+            last_synced_at: str = private.get("lastSyncedAt", "")
             mirror_event_id = my_id
+            is_recurring = cls.has_recurring_tail(source_event_id)
             if not source_event_id:
                 logger.error(f"Misaligned or bad data : {mirror_event_id}")
         else:
             source_event_id = my_id
-            source_calendar_id = cal.id
-            updated_at = str(data.get("updated",""))  # the date is a simple date string
+            source_calendar_id = cal_id
+            updated_at = str(data.get("updated", ""))  # the date is a simple date string
             last_synced_at = ""
             mirror_event_id = None
+            is_recurring = (data.get("recurringEventId") is not None)
 
         return EventType(
             status=status,
@@ -166,6 +180,7 @@ class EventConverter:
             mirror_event_id=mirror_event_id,
             start=data.get("start"),
             end=data.get("end"),
+            is_recurring=is_recurring,
 
             summary=data.get("summary", ""),
             description=data.get("description", ""),

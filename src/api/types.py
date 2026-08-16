@@ -15,6 +15,7 @@ class EventType:
     mirror_event_id: Optional[str]
     start: Any
     end: Any
+    is_recurring:bool
 
     summary: str
     description: str

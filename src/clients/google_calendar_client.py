@@ -145,7 +145,7 @@ class GoogleCalendarClient:
             calendarId=calendar.id,
             eventId=event_id
         )
-        return EventConverter.to_event_data(result, calendar, is_from_mirror=False)
+        return EventConverter.to_event_data(result, calendar.id, is_from_mirror=False)
 
     def update_event(self, event_id: str, calendar_id: str, event: EventType) -> None:
 
@@ -188,29 +188,58 @@ class GoogleCalendarClient:
             ruleId=rule_id
         )
 
+    def deleted_calendar_events(
+            self,
+            calendar_id : str,
+            updated_min: datetime,
+            max_results: int = 2500,
+    ) -> list[GoogleEventData]:
+
+        updated_min_str = to_rfc3339(updated_min)
+
+        events: list[GoogleEventData] = []
+        page_token: Optional[str] = None
+
+        while True:
+            results = google_call(
+                self._google_client.events().list,
+                operation="list",
+                showDeleted = True,
+                calendarId=calendar_id,
+                maxResults=max_results,
+                updatedMin=updated_min_str,
+                pageToken=page_token
+            )
+
+            for item in results.get("items", []):
+                if item.get("status") == "cancelled" :
+                    events.append(GoogleEventData(data=item))
+
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
+
+        return events
+
     def search_calendar_events(
             self,
-            calendar_id: str = "primary",
-            query: Optional[str] = None,
-            time_min: Optional[datetime] = None,
-            time_max: Optional[datetime] = None,
+            calendar_id: str,
+            time_min: datetime,
+            time_max: datetime,
+            query: str,
             max_results: int = 2500,
-            single_events: bool = True,
-            order_by: str = "startTime",
-            i_cal_uid: Optional[str] = None,
-            sync_token: Optional[str] = None,
             updated_min: Optional[datetime] = None,
-    ) -> list[GoogleClientJsonType]:
+    ) -> list[GoogleEventData]:
 
         time_min_str = to_rfc3339(time_min)
         time_max_str = to_rfc3339(time_max)
         updated_min_str = to_rfc3339(updated_min)
 
-        events: list[GoogleClientJsonType] = []
+        events: list[GoogleEventData] = []
         page_token: Optional[str] = None
 
         while True:
-            result = google_call(
+            results = google_call(
                 self._google_client.events().list,
                 operation="list",
                 calendarId=calendar_id,
@@ -218,18 +247,16 @@ class GoogleCalendarClient:
                 timeMin=time_min_str,
                 timeMax=time_max_str,
                 maxResults=max_results,
-                singleEvents=single_events,
-                orderBy=order_by,
-                iCalUID=i_cal_uid,
-                syncToken=sync_token,
+                singleEvents=True,
+                orderBy="startTime",
                 updatedMin=updated_min_str,
                 pageToken=page_token
             )
 
-            items = result.get("items", [])
-            events.extend(items)
+            for item in results.get("items", []):
+                events.append(GoogleEventData(data=item))
 
-            page_token = result.get("nextPageToken")
+            page_token = results.get("nextPageToken")
             if not page_token:
                 break
 

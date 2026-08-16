@@ -214,7 +214,7 @@ class TrayController:
             )]
 
         if SETTINGS.get(IS_MASTER_SYNC_COMPUTER):
-            # if there are tokens' use them, a audit and fix is all that is needed otherwise
+            # if there are tokens' use them, an audit and fix is all that is needed otherwise
             # the only reason for a full sync is a buggy program, or data changes in the private,
             # which should be done with the developer scripts
             #menu_def.append(pystray.MenuItem(

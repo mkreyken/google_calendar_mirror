@@ -79,7 +79,7 @@ class Controller:
                     results["Ignored"] += 1
                     continue
 
-            normalize_event = EventConverter.to_event_data(evt, calendar)
+            normalize_event = EventConverter.to_event_data(evt, calendar.id)
             sanitize_event = EventConverter.sanitize_event(normalize_event)
             adjusted_event = EventConverter.mirror_ish(sanitize_event, calendar, sync_time)
             if self.is_audit_any:
@@ -115,18 +115,18 @@ class Controller:
 
         self.sync_all_calendars()
 
-        logger.info("Saving mirrored events")
+        logger.debug("Saving mirrored events")
         self.mirror.save_mirror_mapping()
-        logger.info("End of loop")
+        logger.debug("End of loop")
 
     def sync_all_calendars(self) -> Dict[str, Dict[str, int]]:
         summary = {}
 
         for cal in self.calendar_mapper.get_calendar_sources().values():
-            logger.info(f"Doing Calendar: {cal.name} {cal.id}")
+            logger.debug(f"Doing Calendar: {cal.name} {cal.id}")
             result = self.update_mirror_from_source_calendar(cal)
             summary[cal.id] = result
-            logger.info(f"Finished Calendar: {cal.name} with {dict(result)}")
+            logger.debug(f"Finished Calendar: {cal.name} with {dict(result)}")
 
         return summary
 

@@ -93,10 +93,10 @@ class MirrorCalendarManager:
             )
 
             page_token = results.next_page_token
-            logger.info(
+            logger.debug(
                 f"Reading mirror cnt: {len(results.google_events)} sync: {results.next_sync_token or ''} page: {results.next_page_token or ''}")
             for google_event in results.google_events:
-                event = EventConverter.to_event_data(google_event, self.mirror_calendar, True)
+                event = EventConverter.to_event_data(google_event, self.mirror_calendar.id, True)
                 if event.status == STATUS_CANCELLED or event.status == STATUS_DELETED:
                     continue
                 if not event.mirror_event_id: raise InvalidDataError("not mirror id on mirror read")
@@ -127,7 +127,7 @@ class MirrorCalendarManager:
 
             if not page_token:
                 break
-        logger.info(f"Finished reading mirror cnt :{len(self.mappings)} bad : {len(self.bad_events or [])}")
+        logger.debug(f"Finished reading mirror cnt :{len(self.mappings)} bad : {len(self.bad_events or [])}")
         if is_audit:
             audit_results = self.compare_maps(old_mapping, self.mappings)
             logger.info(f"Audit results: {dict(audit_results)}")
@@ -158,10 +158,7 @@ class MirrorCalendarManager:
         mapping = mappings.get(event.source_event_id)
         if not mapping:
             return None
-        if mapping.source_calendar_id == event.source_calendar_id:
-            return mapping
-        logger.warning(f"--- Found an invalid match {event.source_event_id}")
-        return None
+        return mapping
 
     def audit(self, event: EventType, and_update: bool = True, always_update: bool = True) -> str:
 
@@ -183,7 +180,7 @@ class MirrorCalendarManager:
                 )
             else:
                 return "deleted:NF"
-            self.__update_sync_data(event, mapped_event.mirror_event_id, deleted=True)
+            self.__update_sync_data_and_log(event, mapped_event.mirror_event_id, deleted=True)
             return "deleted"
 
         if not mapped_event:
@@ -203,7 +200,7 @@ class MirrorCalendarManager:
                 event_id=mapped_event.mirror_event_id,
                 event=event
             )
-            self.__update_sync_data(event, mapped_event.mirror_event_id)
+            self.__update_sync_data_and_log(event, mapped_event.mirror_event_id)
             return "updated"
 
         else:
@@ -217,7 +214,7 @@ class MirrorCalendarManager:
                 calendar_id=self.mirror_calendar.id,
                 event=event
             )
-            self.__update_sync_data(event, created["id"])
+            self.__update_sync_data_and_log(event, created["id"])
             return "added"
 
     def apply_change_to_mirror(self, event: EventType) -> str:
@@ -232,7 +229,7 @@ class MirrorCalendarManager:
                 )
             else:
                 return "deleted:NF"
-            self.__update_sync_data(event, mapped_event.mirror_event_id, deleted=True)
+            self.__update_sync_data_and_log(event, mapped_event.mirror_event_id, deleted=True)
             return "deleted"
 
         if mapped_event:
@@ -242,7 +239,7 @@ class MirrorCalendarManager:
                 event_id=mapped_event.mirror_event_id,
                 event=event
             )
-            self.__update_sync_data(event, mapped_event.mirror_event_id)
+            self.__update_sync_data_and_log(event, mapped_event.mirror_event_id)
             return "updated"
 
         else:
@@ -256,11 +253,12 @@ class MirrorCalendarManager:
                 calendar_id=self.mirror_calendar.id,
                 event=event
             )
-            self.__update_sync_data(event, created["id"])
+            self.__update_sync_data_and_log(event, created["id"])
             return "added"
 
-    def __update_sync_data(self, event: EventType, mirror_event_id, deleted=False) -> None:
+    def __update_sync_data_and_log(self, event: EventType, mirror_event_id, deleted=False) -> None:
         source_event_id = event.source_event_id
+        self.log_change(event, deleted)
         mapping = self.mappings.get(source_event_id)
         if deleted:
             if mapping:
@@ -364,6 +362,16 @@ class MirrorCalendarManager:
             # If multiple exist, pick the newest
             candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return candidates[0]
+
+    def log_change(self, event:EventType,deleted:bool)->  None:
+        if event.is_recurring :
+            return
+        cal = self.calendars.calendars.get(event.source_calendar_id)
+        if cal:
+            cal_name = cal.name
+        else:
+            cal_name = "<<>>"
+        logger.info(f" log {deleted} {event.start} {event.end} {event.summary} {cal_name}")
 
     @classmethod
     def summarize_mapping_events(cls) -> List[str]:

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from src.api.calendar_source_info import CalendarMappingApi
 from src.api.mirror_calendar_manager import MirrorCalendarManager
@@ -35,7 +35,7 @@ def find_overlaps(mapping_events: Dict[str, MappingEvent]) -> Dict[str, List[Tup
                 b_start = from_rfc3339(b.start)
                 b_end = from_rfc3339(b.end)
 
-                # If b starts after a ends, no further overlaps possible
+                # If 'b' starts after 'a' ends, no further overlaps possible
                 if b_start >= a_end:
                     break
 
@@ -49,23 +49,19 @@ def find_overlaps(mapping_events: Dict[str, MappingEvent]) -> Dict[str, List[Tup
     return overlaps
 
 
-def conflicting_events() -> None:
-    val = SETTINGS.get(EMAIL_TO_REPORTS)
-    if isinstance(val, str):
-        to_email = val
-    else:
-        raise ValueError("Email is not type str")
+def conflicting_events() -> Optional[str] :
+
     mappings = MirrorCalendarManager.mapping_file()
     if not mappings:
         print("No Mappings locally")
-        return
+        return None
 
     calendars = CalendarMappingApi.read_calendar_sources()
     overlaps = find_overlaps(mappings)
 
     if not overlaps:
         print("No Overlaps")
-        return
+        return None
     lines: List[str] = []
     for cal_id, pairs in overlaps.items():
         cal_name = calendars[cal_id].name
@@ -73,16 +69,25 @@ def conflicting_events() -> None:
         for a, b in pairs:
             lines.append(f"Overlap end event {a.end} with start {b.start}")
 
-    subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
-    body_text = "\n".join(lines)
 
-    sender = GmailTextSender()
-    sender.send_text(
-        to=to_email,
-        subject=subject,
-        body=body_text,
-    )
+    return "\n".join(lines)
+
 
 
 if __name__ == "__main__":
-    conflicting_events()
+    body_text = conflicting_events()
+    if not body_text:
+        print("no results")
+    else :
+        subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
+        sender = GmailTextSender()
+        val = SETTINGS.get(EMAIL_TO_REPORTS)
+        if isinstance(val, str):
+            to_email = val
+        else:
+            raise ValueError("Email is not type str")
+        sender.send_text(
+            to=to_email,
+            subject=subject,
+            body=body_text
+        )

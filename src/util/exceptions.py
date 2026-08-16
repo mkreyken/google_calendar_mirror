@@ -82,7 +82,7 @@ def google_call(func, *args, operation: str = "unset", **kwargs) -> Any:
         if status in (429, 500, 503):
             raise GoogleRateLimitError("Rate limit or server error") from e
 
-        raise GoogleApiError(f"Unhandled Google API error: {status}") from e
+        raise GoogleApiError(f"Unhandled Google API error: {status} {reason}") from e
 
     except Exception as e:
         logger.exception("Unexpected error during Google API call")
