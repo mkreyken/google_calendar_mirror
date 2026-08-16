@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 
 from src.api.calendar_source_info import CalendarMappingApi
 from src.api.mirror_calendar_manager import MirrorCalendarManager
@@ -49,19 +49,16 @@ def find_overlaps(mapping_events: Dict[str, MappingEvent]) -> Dict[str, List[Tup
     return overlaps
 
 
-def conflicting_events() -> Optional[str] :
-
+def conflicting_events() -> str:
     mappings = MirrorCalendarManager.mapping_file()
     if not mappings:
-        print("No Mappings locally")
-        return None
+        return "No Mappings file to check locally"
 
     calendars = CalendarMappingApi.read_calendar_sources()
     overlaps = find_overlaps(mappings)
 
     if not overlaps:
-        print("No Overlaps")
-        return None
+        return "No Overlaps found"
     lines: List[str] = []
     for cal_id, pairs in overlaps.items():
         cal_name = calendars[cal_id].name
@@ -69,16 +66,14 @@ def conflicting_events() -> Optional[str] :
         for a, b in pairs:
             lines.append(f"Overlap end event {a.end} with start {b.start}")
 
-
     return "\n".join(lines)
-
 
 
 if __name__ == "__main__":
     body_text = conflicting_events()
     if not body_text:
         print("no results")
-    else :
+    else:
         subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
         sender = GmailTextSender()
         val = SETTINGS.get(EMAIL_TO_REPORTS)

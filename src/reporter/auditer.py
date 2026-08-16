@@ -2,7 +2,7 @@ from datetime import datetime
 
 from src.clients.google_mail_client import GmailTextSender
 from src.clients.settings_on_disk import EMAIL_TO_LOGS, SETTINGS
-from src.reporter.status_manager import StatusManager
+from src.reporter.reports_manager import ReportsManager
 from src.services.controller import Controller
 from src.services.env import AUDIT
 
@@ -14,11 +14,11 @@ def remote_audit() -> None:
     else:
         raise ValueError("Email is not type str")
     controller = Controller()
-    status_manager = StatusManager()
+    reports_manager = ReportsManager()
 
     controller_text = controller.run_with_logger_output(AUDIT)
 
-    status_text = status_manager.get_status_text()
+    status_text = reports_manager.get_notification_text()
 
     body_text = status_text + "\n" + controller_text
 

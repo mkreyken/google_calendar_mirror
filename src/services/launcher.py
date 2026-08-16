@@ -1,20 +1,17 @@
 import logging
-import os
-import subprocess
-import sys
 import threading
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional, Callable
 
 import pystray  # type: ignore[import-untyped]
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from pystray import Menu, MenuItem
 
 from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS
-from src.reporter.status_manager import StatusManager
+from src.reporter.reports_manager import ReportsManager
 from src.services.controller import Controller
 from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
-from src.util.filesystem import get_log_directory
+from src.util.filesystem import get_log_directory, get_data_location_as_path
 
 # --- Optional: Windows toast notifications via winrt ---
 # on laptop pad, 2 finger click is right click
@@ -46,12 +43,12 @@ app_logger.propagate = False
 # --- Sync logic ---
 
 class SyncManager:
-    to_email: str
+    to_logs_email: str
 
     def __init__(self):
         val = SETTINGS.get(EMAIL_TO_LOGS)
         if isinstance(val, str):
-            self.to_email = val
+            self.to_logs_email = val
         else:
             raise ValueError("Email is not type str")
 
@@ -60,7 +57,7 @@ class SyncManager:
         # noinspection PyBroadException
         try:
             controller = Controller()
-            controller.run_with_email_report(kind, self.to_email)
+            controller.run_with_email_report(kind, self.to_logs_email)
             success = True
             app_logger.info(f"{kind.capitalize()} sync completed successfully.")
         except Exception:
@@ -102,28 +99,10 @@ class NotificationManager:
             app_logger.exception("Failed to send toast notification")
 
 
-def create_icon(text: str = "SYNC") -> Image.Image:
-    size = (64, 64)
-    image = Image.new("RGB", size, color=(30, 30, 30))
-    draw = ImageDraw.Draw(image)
-
-    # Background circle
-    draw.ellipse([4, 4, 60, 60], fill=(0, 120, 215), outline=(255, 255, 255))
-
-    # Text
-    # noinspection PyBroadException
-    try:
-        font = ImageFont.truetype("arial.ttf", 20)
-    except Exception:
-        font = ImageFont.load_default()  # type: ignore[assignment]
-
-    draw.text(
-        (size[0] // 2, size[1] // 2),
-        text,
-        fill=(255, 255, 255),
-        anchor="mm",
-        font=font,
-    )
+def create_icon() -> Image.Image:
+    logo_path = get_data_location_as_path("logo.png")
+    image: Image.Image = Image.open(logo_path)
+    image = image.resize((64, 64), Image.Resampling.LANCZOS)
     return image
 
 
@@ -132,17 +111,17 @@ class TrayController:
             self,
             app_name: str,
             sync_manager: SyncManager,
-            status_manager: StatusManager,
+            reports_manager: ReportsManager,
             notification_manager: NotificationManager,
             log_file: Path,
     ):
         self.app_name = app_name
         self.sync_manager = sync_manager
-        self.status_manager = status_manager
+        self.reports_manager = reports_manager
         self.notification_manager = notification_manager
         self.log_file = log_file
 
-        icon_image = create_icon("SY")
+        icon_image = create_icon()
         self.icon: IconType = pystray.Icon(
             self.app_name,
             icon_image,
@@ -152,9 +131,14 @@ class TrayController:
 
     # --- Menu callbacks ---
 
-    def _run_sync_background(self, kind: str):
+    def _run_sync_background(self, kind: str,
+                             follow_up: Optional[Callable[[bool], None]] = None):
         def worker() -> None:
             success = self.sync_manager.run_sync(kind)
+
+            if follow_up:
+                follow_up(success)
+
             title = "Sync completed" if success else "Sync failed"
             message = f"{kind.capitalize()} sync finished."
             self.notification_manager.send_toast(title, message)
@@ -165,30 +149,20 @@ class TrayController:
         self._run_sync_background(FULL_SYNC)
 
     def on_sync_partial(self) -> None:
-        self._run_sync_background(INCREMENTAL_SYNC)
+        self._run_sync_background(INCREMENTAL_SYNC, self.on_sync_partial_finished)
 
     def on_sync_refresh(self) -> None:
         self._run_sync_background(AUDIT_AND_FIX)
 
-    def on_open_log(self) -> None:
-        if not self.log_file.exists():
-            app_logger.warning("Log file does not exist yet.")
-            return
-        # noinspection PyBroadException
-        try:
-            if sys.platform == "win32":
-                os.startfile(str(self.log_file))
-            else:
-                opener = "xdg-open" if os.name == "posix" else "open"
-                subprocess.run([opener, str(self.log_file)])
-        except Exception:
-            app_logger.exception("Failed to open log file")
-
-    def on_email_log(self) -> None:
-        pass
+    @classmethod
+    def on_sync_partial_finished(cls, was_success: bool) -> None:
+        if was_success:
+            to_val = SETTINGS.get(EMAIL_TO_LOGS)
+            if isinstance(to_val, str):
+                ReportsManager().full_report(to_val)
 
     def on_status(self) -> None:
-        status_text = self.status_manager.get_status_text()
+        status_text = self.reports_manager.get_notification_text()
         app_logger.info("Status requested:\n%s", status_text)
         # if "do not disturb" is on, this goes into the notification window
         self.notification_manager.send_toast("Sync Status", status_text)
@@ -197,10 +171,10 @@ class TrayController:
     def on_exit(self, icon: IconType) -> None:
         icon.stop()
 
-    def on_report_calendar(self) -> None:
+    def on_report_venues(self) -> None:
         pass
 
-    def on_report_maintenance(self) -> None:
+    def on_report_periodic(self) -> None:
         pass
 
     # --- Menu creation ---
@@ -217,11 +191,11 @@ class TrayController:
             # if there are tokens' use them, an audit and fix is all that is needed otherwise
             # the only reason for a full sync is a buggy program, or data changes in the private,
             # which should be done with the developer scripts
-            #menu_def.append(pystray.MenuItem(
+            # menu_def.append(pystray.MenuItem(
             #    "Sync now (full)",
             #    self.on_sync_full))
             menu_def.append(pystray.MenuItem(
-                "Sync now (incremental)",
+                "Sync now and reports",
                 self.on_sync_partial))
         menu_def.append(pystray.MenuItem(
             "Sync (Refresh)",
@@ -230,19 +204,14 @@ class TrayController:
         menu_def.append(pystray.Menu.SEPARATOR)
 
         menu_def.append(pystray.MenuItem(
-            "Email month Calendar Report",
-            self.on_report_calendar,
+            "Email venue Calendars",
+            self.on_report_venues,
         ))
 
         menu_def.append(pystray.MenuItem(
-            "Email Maintenance Report",
-            self.on_report_maintenance,
+            "Email Regular Reports",
+            self.on_report_periodic,
         ))
-
-        menu_def.append(pystray.Menu.SEPARATOR)
-
-        menu_def.append(pystray.MenuItem("Open log file", self.on_open_log))
-        menu_def.append(pystray.MenuItem("Email log file", self.on_email_log))
 
         menu_def.append(pystray.Menu.SEPARATOR)
 
@@ -262,14 +231,14 @@ class TrayController:
 def main() -> None:
     APP_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    status_manager = StatusManager()
+    reports_manager = ReportsManager()
     sync_manager = SyncManager()
     notification_manager = NotificationManager(APP_ID, use_toast=True)
 
     tray = TrayController(
         app_name=APP_NAME,
         sync_manager=sync_manager,
-        status_manager=status_manager,
+        reports_manager=reports_manager,
         notification_manager=notification_manager,
         log_file=APP_LOG_FILE,
     )

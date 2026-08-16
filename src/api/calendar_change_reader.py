@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class GoogleCalendarChangeReader:
     client: GoogleCalendarClient
-    source_calendar: CalendarSourceInfo
+    source_calendar:CalendarSourceInfo
     calendar_mapper: CalendarMappingApi
 
     def __init__(self, client: GoogleCalendarClient, source_calendar: CalendarSourceInfo,
