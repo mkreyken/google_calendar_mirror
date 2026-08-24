@@ -27,7 +27,6 @@ GoogleClientJsonType = Dict[str, Any]
 
 
 class GoogleCalendarClient:
-
     credentials_file: str
     token_filename: str
     credentials: Optional[Credentials]
@@ -80,7 +79,9 @@ class GoogleCalendarClient:
     def _google_client(self) -> GoogleCalendarClientType:
         if self._google_client_With_auth is None:
             self.credentials = self._authenticate()
-            self._google_client_With_auth = build("calendar", "v3", credentials=self.credentials)
+            self._google_client_With_auth = build(
+                "calendar", "v3",
+                credentials=self.credentials, cache_discovery=False)
         return self._google_client_With_auth
 
     def list_events(
@@ -190,7 +191,7 @@ class GoogleCalendarClient:
 
     def deleted_calendar_events(
             self,
-            calendar_id : str,
+            calendar_id: str,
             updated_min: datetime,
             max_results: int = 2500,
     ) -> list[GoogleEventData]:
@@ -204,7 +205,7 @@ class GoogleCalendarClient:
             results = google_call(
                 self._google_client.events().list,
                 operation="list",
-                showDeleted = True,
+                showDeleted=True,
                 calendarId=calendar_id,
                 maxResults=max_results,
                 updatedMin=updated_min_str,
@@ -212,7 +213,7 @@ class GoogleCalendarClient:
             )
 
             for item in results.get("items", []):
-                if item.get("status") == "cancelled" :
+                if item.get("status") == "cancelled":
                     events.append(GoogleEventData(data=item))
 
             page_token = results.get("nextPageToken")

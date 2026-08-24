@@ -141,13 +141,15 @@ class MirrorCalendarManager:
         old_keys = set(old)
         new_keys = set(new)
 
-        counts["added"] += len(new_keys - old_keys)
-        counts["deleted"] += len(old_keys - new_keys)
+        counts["map added"] += len(new_keys - old_keys)
+        counts["map deleted"] += len(old_keys - new_keys)
 
         # Must loop for updated vs unchanged
         for key in old_keys & new_keys:
-            counts["updated" if old[key] != new[key] else "unchanged"] += 1
-
+            if old[key] != new[key] :
+                counts["map updated"] += 1
+            else :
+                counts["map unchanged"] += 1
         return counts
 
     @classmethod

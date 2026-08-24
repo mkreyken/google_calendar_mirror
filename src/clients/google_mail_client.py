@@ -58,7 +58,9 @@ class GmailTextSender:
             with open(self.token_path, "w") as f:
                 f.write(creds.to_json())
 
-        return build("gmail", "v1", credentials=creds)
+        return build(
+            "gmail", "v1",
+            credentials=creds, cache_discovery=False)
 
     # noinspection PyMethodMayBeStatic
     def _build_message(

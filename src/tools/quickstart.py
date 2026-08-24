@@ -58,7 +58,9 @@ def main() -> None:
             token.write(creds.to_json())
 
     try:
-        service = build("calendar", "v3", credentials=creds)
+        service = build(
+            "calendar", "v3",
+            credentials=creds, cache_discovery=False)
 
         # Call the Calendar API
         now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()

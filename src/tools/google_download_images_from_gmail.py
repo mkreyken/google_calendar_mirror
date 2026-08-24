@@ -78,7 +78,9 @@ class ImageAgent:
             with open(token_path, "w") as f:
                 f.write(creds.to_json())
 
-        return build("gmail", "v1", credentials=creds)
+        return build(
+            "gmail", "v1",
+            credentials=creds, cache_discovery=False)
 
     def get_or_create_label(self, label_name: str) -> str:
         labels = self.service.users().labels().list(userId="me").execute().get("labels", [])
