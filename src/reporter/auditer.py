@@ -5,6 +5,7 @@ from src.clients.settings_on_disk import EMAIL_TO_LOGS, SETTINGS
 from src.reporter.reports_manager import ReportsManager
 from src.services.controller import Controller
 from src.services.env import AUDIT
+from src.services.run_with_logger import RunResults
 
 
 def remote_audit() -> None:
@@ -16,11 +17,11 @@ def remote_audit() -> None:
     controller = Controller()
     reports_manager = ReportsManager()
 
-    controller_text = controller.run_with_logger_output(AUDIT)
+    results : RunResults = controller.run_with_logger_output(AUDIT)
 
     status_text = reports_manager.get_notification_text()
 
-    body_text = status_text + "\n" + controller_text
+    body_text = status_text + "\n" + results.logs
 
     subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
 

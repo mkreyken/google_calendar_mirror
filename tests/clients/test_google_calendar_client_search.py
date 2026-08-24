@@ -18,6 +18,6 @@ events = client.search_calendar_events(
 )
 
 for ev in events:
-    start = ev.get("start")
-    summary = ev.get("summary")
+    start = ev.data.get("start")
+    summary = ev.data.get("summary")
     print(f" {to_rfc3339(start)}  {summary}  ")

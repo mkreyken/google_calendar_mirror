@@ -14,6 +14,10 @@ LOG_FILE = get_log_directory() / "sync.log"
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 FORMATTER = logging.Formatter(LOG_FORMAT)
 
+@dataclass(frozen=True)
+class RunResults:
+    logs: str
+    success : bool
 
 def close_handlers(logger: logging.Logger) -> None:
     """Remove and close every handler attached directly to a logger."""
@@ -112,7 +116,7 @@ def configure_logging() -> LoggerData:
     )
 
 
-def run_job_and_capture_log(function: JobFunc) -> str:
+def run_job_and_capture_log(function: JobFunc) -> RunResults:
     # Close handlers from a previous configuration before renaming the file.
     close_existing_logging()
 
@@ -123,10 +127,12 @@ def run_job_and_capture_log(function: JobFunc) -> str:
     logger = logger_data.logger
 
     logger.debug("Job started")
+    success = False
 
     # noinspection broad-exception
     try:
         function()
+        success = True
     except Exception as ex:
         logger.exception("Job failed with an unhandled exception", exc_info=ex)
 
@@ -141,4 +147,4 @@ def run_job_and_capture_log(function: JobFunc) -> str:
         close_existing_logging()
         logger_data.output_buffer.close()
 
-    return log_text
+    return RunResults(log_text,success)

@@ -9,7 +9,7 @@ from src.api.types import CalendarSourceInfo, CalendarPageData, CalendarChangeDa
 from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.mirror_key_store import TokenStoreValue
 from src.services.env import FULL_SYNC, INCREMENTAL_SYNC
-from src.util.date_util import min_mirror_date, max_mirror_date, should_run_full_sync, current_sync_token_datestamp
+from src.util.date_util import min_mirror_date, max_mirror_date, current_sync_token_datestamp
 from src.util.exceptions import GoogleInvalidSyncToken, InvalidDataError
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ class GoogleCalendarChangeReader:
         if is_windowed_read:
             return self.windowed_read()
 
-        if not sync_token or should_run_full_sync(sync_token.date_stamp) or force_full_sync:
+        if not sync_token or force_full_sync:
             return self.full_read()
 
         logger.debug("Incremental sync")

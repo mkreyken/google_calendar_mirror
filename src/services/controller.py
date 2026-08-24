@@ -11,8 +11,9 @@ from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.google_mail_client import GmailTextSender
 from src.services.env import FULL_SYNC
 from src.services.events_converter import EventConverter
-from src.services.run_with_logger import run_job_and_capture_log
+from src.services.run_with_logger import run_job_and_capture_log, RunResults
 from src.util.date_util import min_mirror_date, max_mirror_date, from_rfc3339
+from src.util.exceptions import GoogleInvalidSyncToken
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +47,12 @@ class Controller:
     def is_audit_fix_and_overwrite(self) -> bool:
         return self.kind == src.services.env.AUDIT_AND_UPDATE
 
-    def update_mirror_from_source_calendar(self, calendar: CalendarSourceInfo) -> Dict[str, int]:
+    def update_mirror_from_source_calendar(self, calendar: CalendarSourceInfo, is_full_sync : bool) -> Dict[str, int]:
 
         if not self.mirror: raise RuntimeError("Mirror not initialized")
         calendar_sync = GoogleCalendarChangeReader(self.client, calendar, self.calendar_mapper)
         sync_time = datetime.now(timezone.utc)
-        changes = calendar_sync.next_read(self.is_full_sync, self.is_audit_any)
+        changes = calendar_sync.next_read(is_full_sync, self.is_audit_any)
         time_min = min_mirror_date()
         time_max = max_mirror_date()
 
@@ -123,20 +124,24 @@ class Controller:
         summary = {}
 
         for cal in self.calendar_mapper.get_calendar_sources().values():
+            is_full_sync = self.is_full_sync
             logger.debug(f"Doing Calendar: {cal.name} {cal.id}")
-            result = self.update_mirror_from_source_calendar(cal)
+            try :
+                result = self.update_mirror_from_source_calendar(cal, is_full_sync)
+            except GoogleInvalidSyncToken:
+                result = self.update_mirror_from_source_calendar(cal, True)
             summary[cal.id] = result
             logger.debug(f"Finished Calendar: {cal.name} with {dict(result)}")
 
         return summary
 
-    def run_with_logger_output(self,kind) ->str:
+    def run_with_logger_output(self,kind) ->RunResults:
         self.kind = kind
         return run_job_and_capture_log(self.__run)
 
-    def run_with_email_report(self, kind: str, to_email: str) -> None:
+    def run_with_email_report(self, kind: str, to_email: str) -> RunResults:
         self.kind = kind
-        log_text = run_job_and_capture_log(self.__run)
+        results : RunResults = run_job_and_capture_log(self.__run)
         subject = f"Job Run Report - {datetime.now():%Y-%m-%d %H:%M:%S}"
 
         if to_email:
@@ -144,5 +149,5 @@ class Controller:
             sender.send_text(
                 to=to_email,
                 subject=subject,
-                body=log_text,
-    )
+                body=results.logs)
+        return results

@@ -57,12 +57,14 @@ class SyncManager:
         # noinspection PyBroadException
         try:
             controller = Controller()
-            controller.run_with_email_report(kind, self.to_logs_email)
-            success = True
-            app_logger.info(f"{kind.capitalize()} sync completed successfully.")
+            results = controller.run_with_email_report(kind, self.to_logs_email)
+            success = results.success
         except Exception:
-            app_logger.exception(f"{kind.capitalize()} sync failed.")
             success = False
+        if success:
+            app_logger.info(f"{kind.capitalize()} sync completed successfully.")
+        else :
+            app_logger.exception(f"{kind.capitalize()} sync failed.")
 
         return success
 
