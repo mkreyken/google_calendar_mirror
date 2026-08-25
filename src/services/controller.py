@@ -131,7 +131,7 @@ class Controller:
             except GoogleInvalidSyncToken:
                 result = self.update_mirror_from_source_calendar(cal, True)
             summary[cal.id] = result
-            logger.debug(f"Finished Calendar: {cal.name} with {dict(result)}")
+            logger.info(f"Finished Calendar: {cal.name} with {dict(result)}")
 
         return summary
 

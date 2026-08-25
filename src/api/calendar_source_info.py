@@ -15,7 +15,6 @@ def generate_location_short_code(name: str) -> str:
     else:
         return f"Z{key}"
 
-
 class CalendarMappingApi:
     client: GoogleCalendarClient
     calendars: dict[str, CalendarSourceInfo]

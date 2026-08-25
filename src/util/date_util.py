@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional, Any
 from zoneinfo import ZoneInfo
 
-from src.services.env import MIRROR_MONTHS_MIN, MIRROR_MONTHS_MAX
+from src.services.env import MIRROR_MONTHS_MIN, MIRROR_MONTHS_MAX, LOCAL_TZ
 
 
 def google_to_rfc3339(obj: Any) -> str:
@@ -19,6 +19,22 @@ def google_to_rfc3339(obj: Any) -> str:
 
     raise RuntimeError("no date conversion setup")
 
+
+def google_to_datetime(obj: dict) -> datetime:
+    # Timed event
+    if "dateTime" in obj:
+        # Parse Google's local datetime (no offset)
+        dt = datetime.fromisoformat(obj["dateTime"])
+        tz = ZoneInfo(obj["timeZone"])
+        dt = dt.replace(tzinfo=tz)
+
+        return dt
+
+    # All-day event
+    if "date" in obj:
+        dt = datetime.fromisoformat(obj["date"])
+        return dt.replace(tzinfo=LOCAL_TZ)
+    raise RuntimeError("no date conversion setup")
 
 def calendar_tz_name(dt: datetime) -> str:
     if dt.tzinfo is None:

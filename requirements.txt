@@ -1,17 +1,22 @@
-google-api-python-client>=2.100.0
-google-auth>=2.0.0
-google-auth-httplib2>=0.2.0
-google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.199.0
+google-auth>=2.56.3
+google-auth-httplib2>=0.4.1
+google-auth-oauthlib>=1.4.0
 # winrt - not a python package
-pystray
-pillow
-winrt-runtime
-winrt-Windows.Foundation
-winrt-Windows.Foundation.Collections
-winrt-Windows.UI.Notifications
-winrt-Windows.UI.Notifications.Management
-winrt-Windows.ApplicationModel
+pystray >= 0.19.5
+pillow>= 12.3.0
+winrt-runtime>= 3.2.1
+winrt-Windows.Foundation>= 3.2.1
+winrt-Windows.Foundation.Collections>=3.2.1
+winrt-Windows.UI.Notifications>=3.2.1
+winrt-Windows.UI.Notifications.Management>=3.2.1
+winrt-Windows.ApplicationModel>=3.2.1
 
 # winrt-Windows is above
-tzdata
+tzdata>= 2026.3
+
+# PDF reports
+reportlab>= 5.0.1
+# type library for reportlab
+types-reportlab>= 4.5.1
 

@@ -5,8 +5,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
-from src.api.calendar_source_info import CalendarSourceInfo
-from src.api.types import EventType, GoogleEventData, STATUS_OK, STATUS_CANCELLED, MappingEvent
+from src.api.types import EventType, GoogleEventData, STATUS_OK, STATUS_CANCELLED, MappingEvent, CalendarSourceInfo
 from src.clients.settings_on_disk import SETTINGS, GOOGLE_COLOR_AS_HEX
 from src.services.env import SENSITIVE_KEYWORDS
 from src.util.date_util import to_rfc3339, google_to_rfc3339

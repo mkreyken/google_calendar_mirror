@@ -1,3 +1,5 @@
+import zoneinfo
+
 OATH_CLIENT_ID = "156693914634-44dp6foqsn981ei05rbd5j4c9svkh3au.apps.googleusercontent.com"
 SECRETS_FILE = "client_secret_2_" + OATH_CLIENT_ID + ".json"
 TOKEN_FILE = "token.json"
@@ -5,6 +7,8 @@ TOKEN_FILE = "token.json"
 MIRROR_CALENDAR = "z_ic_all_events"
 CALENDAR_TOKEN_FILENAME = "calendar_source_info.json"
 SETTINGS_ON_DISK_FILENAME = "settings.json"
+
+LOCAL_TZ = zoneinfo.ZoneInfo("America/Vancouver")
 
 APP_NAME = "CalendarSyncApp"
 
