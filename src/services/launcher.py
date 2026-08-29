@@ -1,5 +1,7 @@
+import datetime
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any, List, Optional, Callable
 
@@ -7,11 +9,14 @@ import pystray  # type: ignore[import-untyped]
 from PIL import Image
 from pystray import Menu, MenuItem
 
+from src.api import user_is_in_calendar
+from src.api.calendar_source_info import CalendarMappingApi
 from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS
 from src.reporter.reports_manager import ReportsManager
 from src.services.controller import Controller
 from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
 from src.util.filesystem import get_log_directory, get_data_location_as_path
+from src.util.semaphore import SyncSemaphore
 
 # --- Optional: Windows toast notifications via winrt ---
 # on laptop pad, 2 finger click is right click
@@ -44,15 +49,24 @@ app_logger.propagate = False
 
 class SyncManager:
     to_logs_email: str
+    sync_semaphore: SyncSemaphore
 
     def __init__(self):
+        self.sync_semaphore = SyncSemaphore()
         val = SETTINGS.get(EMAIL_TO_LOGS)
         if isinstance(val, str):
             self.to_logs_email = val
         else:
             raise ValueError("Email is not type str")
+        threading.Thread(
+            target=self._schedule_loop,
+            daemon=True
+        ).start()
 
-    def run_sync(self, kind: str) -> bool:
+    def is_running(self) -> bool:
+        return self.sync_semaphore.sync_is_running()
+
+    def _run_sync(self, kind: str) -> bool:
         app_logger.info(f"Starting {kind} sync...")
         # noinspection PyBroadException
         try:
@@ -63,10 +77,55 @@ class SyncManager:
             success = False
         if success:
             app_logger.info(f"{kind.capitalize()} sync completed successfully.")
-        else :
+        else:
             app_logger.exception(f"{kind.capitalize()} sync failed.")
 
         return success
+
+    def run_sync_background(self, kind: str,
+                            follow_up: Optional[Callable[[str, bool], None]] = None) -> Optional[str]:
+
+        if not self.sync_semaphore.try_start_sync():
+            return "Busy"
+
+        def worker() -> None:
+            try:
+                success = self._run_sync(kind)
+
+                if follow_up:
+                    follow_up(kind, success)
+
+            finally:
+                # ALWAYS release semaphore even if sync crashes
+                self.sync_semaphore.end_sync()
+
+        threading.Thread(target=worker, daemon=True).start()
+        return None
+
+    def _schedule_loop(self) -> None:
+
+        last_run = CalendarMappingApi.get_latest_sync()
+        if last_run:
+            last_run_dt = last_run.date_stamp
+        else:
+            last_run_dt = datetime.datetime.now()
+
+        interval = datetime.timedelta(hours=48)
+        short_wait = datetime.timedelta(minutes=10)
+        next_run = last_run_dt + interval
+
+        while True:
+            now = datetime.datetime.now()
+
+            if now >= next_run:
+                if not user_is_in_calendar.is_calender_on_edge():
+                    # if running, then it doesn't matter
+                    self.run_sync_background(INCREMENTAL_SYNC)
+                    next_run = now + interval
+                else:
+                    next_run = now + short_wait
+
+            time.sleep(120)  # low CPU polling
 
 
 # --- Notifications ---
@@ -109,6 +168,13 @@ def create_icon() -> Image.Image:
 
 
 class TrayController:
+    app_name: str
+    sync_manager: SyncManager
+    reports_manager: ReportsManager
+    notification_manager: NotificationManager
+    log_file: Path
+    icon: IconType
+
     def __init__(
             self,
             app_name: str,
@@ -133,37 +199,40 @@ class TrayController:
 
     # --- Menu callbacks ---
 
-    def _run_sync_background(self, kind: str,
-                             follow_up: Optional[Callable[[bool], None]] = None):
-        def worker() -> None:
-            success = self.sync_manager.run_sync(kind)
+    def _run_sync(self, kind: str,
+                  follow_up: Optional[Callable[[str, bool], None]] = None):
 
-            if follow_up:
-                follow_up(success)
+        message = self.sync_manager.run_sync_background(kind, follow_up)
+        if message:
+            self.notification_manager.send_toast("Sync Busy", message)
+            return
 
-            title = "Sync completed" if success else "Sync failed"
-            message = f"{kind.capitalize()} sync finished."
-            self.notification_manager.send_toast(title, message)
-
-        threading.Thread(target=worker, daemon=True).start()
+    def results_toast(self, kind: str, success: bool) -> None:
+        title = "Sync completed" if success else "Sync failed"
+        message = f"{kind.capitalize()} sync finished."
+        self.notification_manager.send_toast(title, message)
 
     def on_sync_full(self) -> None:
-        self._run_sync_background(FULL_SYNC)
+        self._run_sync(FULL_SYNC)
 
     def on_sync_partial(self) -> None:
-        self._run_sync_background(INCREMENTAL_SYNC, self.on_sync_partial_finished)
+        self._run_sync(INCREMENTAL_SYNC, self.on_sync_partial_finished)
 
     def on_sync_refresh(self) -> None:
-        self._run_sync_background(AUDIT_AND_FIX)
+        self._run_sync(AUDIT_AND_FIX)
 
-    @classmethod
-    def on_sync_partial_finished(cls, was_success: bool) -> None:
+    def on_sync_partial_finished(self, kind: str, was_success: bool) -> None:
         if was_success:
             to_val = SETTINGS.get(EMAIL_TO_LOGS)
             if isinstance(to_val, str):
                 ReportsManager().full_report(to_val)
+        self.results_toast(kind, was_success)
 
     def on_status(self) -> None:
+        if self.sync_manager.is_running():
+            self.notification_manager.send_toast("Sync Status", "Running")
+            return
+
         status_text = self.reports_manager.get_notification_text()
         app_logger.info("Status requested:\n%s", status_text)
         # if "do not disturb" is on, this goes into the notification window
@@ -171,12 +240,21 @@ class TrayController:
 
     # noinspection PyMethodMayBeStatic
     def on_exit(self, icon: IconType) -> None:
+        if self.sync_manager.is_running():
+            self.notification_manager.send_toast("Sync Status", "Running")
+            return
         icon.stop()
 
     def on_report_venues(self) -> None:
+        if self.sync_manager.is_running():
+            self.notification_manager.send_toast("Sync Status", "Running")
+            return
         pass
 
     def on_report_periodic(self) -> None:
+        if self.sync_manager.is_running():
+            self.notification_manager.send_toast("Sync Status", "Running")
+            return
         pass
 
     # --- Menu creation ---

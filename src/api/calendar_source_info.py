@@ -39,6 +39,18 @@ class CalendarMappingApi:
         return token_store.items()
 
 
+    @classmethod
+    def get_latest_sync(cls) -> Optional[TokenStoreValue]:
+        token_store = SyncTokenStore(CALENDAR_TOKEN_FILENAME, False)
+        items: Dict[str, TokenStoreValue] = token_store.items()
+
+        if not items:
+            return None
+
+        # max() with key selects the item with the latest date_stamp
+        latest_key = max(items, key=lambda k: items[k].date_stamp)
+        return items[latest_key]
+
     def check_id_and_throw(self, calender_id: str) -> None:
         if not self.is_valid_calendar_id(calender_id):
             raise ValueError("Invalid Calendar ID")
