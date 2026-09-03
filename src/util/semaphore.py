@@ -2,7 +2,7 @@ import threading
 
 
 class Semaphore:
-    def __init__(self):
+    def __init__(self):  # type: ignore[no-untyped-def]
         self._lock = threading.Lock()
 
     def try_lock(self) -> bool:
@@ -16,7 +16,7 @@ class Semaphore:
 
 
 class SyncSemaphore:
-    def __init__(self):
+    def __init__(self):  # type: ignore[no-untyped-def]
         self._lock = threading.Lock()
         self._sync_running = False
 

@@ -3,4 +3,4 @@ from src.services.launcher import SyncManager
 
 if __name__ == "__main__":
     manager = SyncManager()
-    manager.run_sync(AUDIT)
+    manager._run_sync(AUDIT)

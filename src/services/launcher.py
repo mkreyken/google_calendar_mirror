@@ -11,10 +11,12 @@ from pystray import Menu, MenuItem
 
 from src.api import user_is_in_calendar
 from src.api.calendar_source_info import CalendarMappingApi
-from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS
+from src.clients.settings_on_disk import IS_MASTER_SYNC_COMPUTER, SETTINGS, EMAIL_TO_LOGS, CRON_RUN_INCR_SYNC_HOURS, \
+    CRON_RUN_REPORTS_BEFORE_EOM_DAYS, LAST_REFRESH_DATE, EMAIL_TO_REPORTS
 from src.reporter.reports_manager import ReportsManager
 from src.services.controller import Controller
 from src.services.env import APP_ID, FULL_SYNC, INCREMENTAL_SYNC, AUDIT_AND_FIX, APP_NAME
+from src.util.date_util import parse_datestamp
 from src.util.filesystem import get_log_directory, get_data_location_as_path
 from src.util.semaphore import SyncSemaphore
 
@@ -50,14 +52,30 @@ app_logger.propagate = False
 class SyncManager:
     to_logs_email: str
     sync_semaphore: SyncSemaphore
+    shutdown: bool = False
+    hours_between_incr_sync = 40
+    days_before_eom_reports = 7
 
-    def __init__(self):
+    def __init__(self): # type: ignore[no-untyped-def]
         self.sync_semaphore = SyncSemaphore()
         val = SETTINGS.get(EMAIL_TO_LOGS)
         if isinstance(val, str):
             self.to_logs_email = val
         else:
-            raise ValueError("Email is not type str")
+            raise ValueError(f"{EMAIL_TO_LOGS} is not type str")
+
+        val = SETTINGS.get(CRON_RUN_INCR_SYNC_HOURS)
+        if isinstance(val, int):
+            self.hours_between_incr_sync = val
+        else:
+            raise ValueError(f"{CRON_RUN_INCR_SYNC_HOURS} is not type int")
+
+        val = SETTINGS.get(CRON_RUN_REPORTS_BEFORE_EOM_DAYS)
+        if isinstance(val, int):
+            self.days_before_eom_reports = val
+        else:
+            raise ValueError(f"{CRON_RUN_REPORTS_BEFORE_EOM_DAYS} is not type int")
+
         threading.Thread(
             target=self._schedule_loop,
             daemon=True
@@ -65,6 +83,9 @@ class SyncManager:
 
     def is_running(self) -> bool:
         return self.sync_semaphore.sync_is_running()
+
+    def exiting(self) -> None:
+        self.shutdown = True
 
     def _run_sync(self, kind: str) -> bool:
         app_logger.info(f"Starting {kind} sync...")
@@ -91,7 +112,6 @@ class SyncManager:
         def worker() -> None:
             try:
                 success = self._run_sync(kind)
-
                 if follow_up:
                     follow_up(kind, success)
 
@@ -110,22 +130,49 @@ class SyncManager:
         else:
             last_run_dt = datetime.datetime.now()
 
-        interval = datetime.timedelta(hours=48)
+        interval = datetime.timedelta(hours=self.hours_between_incr_sync)
         short_wait = datetime.timedelta(minutes=10)
         next_run = last_run_dt + interval
 
-        while True:
+        while not self.shutdown:
             now = datetime.datetime.now()
 
             if now >= next_run:
                 if not user_is_in_calendar.is_calender_on_edge():
-                    # if running, then it doesn't matter
+                    self.check_for_secondary()
+                    # if already running, it doesn't matter and this will quit
                     self.run_sync_background(INCREMENTAL_SYNC)
                     next_run = now + interval
                 else:
                     next_run = now + short_wait
 
-            time.sleep(120)  # low CPU polling
+            time.sleep(60)  # maximum delay to hold thread on quit
+
+    def run_refresh_function(self) -> None:
+        self.run_sync_background(AUDIT_AND_FIX)
+
+    def check_for_secondary(self) -> None:
+        today = datetime.date.today()
+
+        last_refresh_str = SETTINGS.get_temp_value(LAST_REFRESH_DATE)
+
+        # If nothing stored yet, treat as needing refresh
+        if not last_refresh_str or not isinstance(last_refresh_str, str):
+            self.run_refresh_function()
+            SETTINGS.set_temp_value(LAST_REFRESH_DATE, today.strftime("%Y%m%d"))
+            return
+
+        last_refresh_date = parse_datestamp(last_refresh_str)
+
+        # Detect month or year change
+        month_changed = (
+                today.year != last_refresh_date.year or
+                today.month != last_refresh_date.month
+        )
+
+        if month_changed:
+            self.run_refresh_function()
+            SETTINGS.set_temp_value(LAST_REFRESH_DATE, today.strftime("%Y%m%d"))
 
 
 # --- Notifications ---
@@ -174,6 +221,8 @@ class TrayController:
     notification_manager: NotificationManager
     log_file: Path
     icon: IconType
+    reports_email: str
+    logs_email: str
 
     def __init__(
             self,
@@ -188,6 +237,16 @@ class TrayController:
         self.reports_manager = reports_manager
         self.notification_manager = notification_manager
         self.log_file = log_file
+
+        val = SETTINGS.get(EMAIL_TO_REPORTS)
+        if isinstance(val, str):
+            self.reports_email = val
+        else:
+            raise ValueError(f"{EMAIL_TO_REPORTS} is not type str")
+
+        val = SETTINGS.get(EMAIL_TO_LOGS)
+        if isinstance(val, str):
+            self.logs_email = val
 
         icon_image = create_icon()
         self.icon: IconType = pystray.Icon(
@@ -243,13 +302,20 @@ class TrayController:
         if self.sync_manager.is_running():
             self.notification_manager.send_toast("Sync Status", "Running")
             return
+        self.sync_manager.exiting()
         icon.stop()
 
-    def on_report_venues(self) -> None:
+    def on_report_venues_next_month(self) -> None:
         if self.sync_manager.is_running():
             self.notification_manager.send_toast("Sync Status", "Running")
             return
-        pass
+        ReportsManager.email_pdf_reports(self.logs_email, 1)
+
+    def on_report_venues_this_month(self) -> None:
+        if self.sync_manager.is_running():
+            self.notification_manager.send_toast("Sync Status", "Running")
+            return
+        ReportsManager.email_pdf_reports(self.logs_email, 0)
 
     def on_report_periodic(self) -> None:
         if self.sync_manager.is_running():
@@ -284,8 +350,13 @@ class TrayController:
         menu_def.append(pystray.Menu.SEPARATOR)
 
         menu_def.append(pystray.MenuItem(
-            "Email venue Calendars",
-            self.on_report_venues,
+            "Email venue Calendars for next month",
+            self.on_report_venues_next_month,
+        ))
+
+        menu_def.append(pystray.MenuItem(
+            "Email venue Calendars for this month",
+            self.on_report_venues_this_month,
         ))
 
         menu_def.append(pystray.MenuItem(

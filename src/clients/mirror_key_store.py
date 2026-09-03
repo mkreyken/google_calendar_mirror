@@ -4,7 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from src.util.filesystem import get_data_location, save_json_file, load_json_file
+from src.services.env import CALENDAR_TOKEN_FILENAME
+from src.util.filesystem import save_json_file, load_json_file, get_data_location_as_path
 
 
 @dataclass(frozen=True)
@@ -15,30 +16,22 @@ class TokenStoreValue:
 
 
 class SyncTokenStore:
-    """
-    Stores the sync id for a particular calendar event in a simple,
-    in-memory dict that is saved/loaded as a single JSON file.
-
-    The file name is provided at creation, so you can have one
-    file per calendar.
-
-    Call save() or finish() when you're done to persist changes.
-    Call reset() to clear everything and return to an empty state.
-
-    the key "sync_id" the sync_id for this file
-    """
     token_path: Path
     token_key_store: Dict[str, TokenStoreValue]
+    _instance = None
 
-    def __init__(self, filename: str, is_empty=False):
-        self.token_path = Path(get_data_location(filename))
-        if not is_empty:
+    def __new__(cls) -> SyncTokenStore:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):  # type: ignore[no-untyped-def]
+        # Only run initialization once
+        if not hasattr(self, "token_key_store"):
+            self.token_path = get_data_location_as_path(CALENDAR_TOKEN_FILENAME)
             self.token_key_store = self._load_values()
-        else:
-            self.token_key_store = {}
-
-        # Register save-on-exit
-        atexit.register(self._save)
+            # Register save-on-exit
+            atexit.register(self._save)
 
     def _load_values(self) -> Dict[str, TokenStoreValue]:
         raw = load_json_file(self.token_path)

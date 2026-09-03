@@ -181,7 +181,7 @@ class MirrorCalendarManager:
                     event_id=mapped_event.mirror_event_id
                 )
             else:
-                return "deleted:NF"
+                return "deleted:NotFound"
             self.__update_sync_data_and_log(event, mapped_event.mirror_event_id, deleted=True)
             return "deleted"
 
@@ -373,7 +373,7 @@ class MirrorCalendarManager:
             cal_name = cal.name
         else:
             cal_name = "<<>>"
-        logger.info(f" log {deleted} {event.start} {event.end} {event.summary} {cal_name}")
+        logger.info(f" log_change {deleted} {event.start} {event.end} {event.summary} {cal_name}")
 
     @classmethod
     def summarize_mapping_events(cls) -> List[str]:

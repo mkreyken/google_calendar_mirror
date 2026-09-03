@@ -3,7 +3,7 @@ from typing import Optional, Dict
 from src.api.types import CalendarSourceInfo, AclInfo
 from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.mirror_key_store import SyncTokenStore, TokenStoreValue
-from src.services.env import KNOWN_LOCATION_CODES, MIRROR_CALENDAR, CALENDAR_TOKEN_FILENAME
+from src.services.env import KNOWN_LOCATION_CODES, MIRROR_CALENDAR
 from src.util.exceptions import InitializationError, InvalidDataError
 
 
@@ -14,6 +14,7 @@ def generate_location_short_code(name: str) -> str:
         return KNOWN_LOCATION_CODES[key]
     else:
         return f"Z{key}"
+
 
 class CalendarMappingApi:
     client: GoogleCalendarClient
@@ -30,18 +31,26 @@ class CalendarMappingApi:
         self.client = client
         self.calendars = {}
         self.mirror_calendar = None
-        self.keystore = SyncTokenStore(CALENDAR_TOKEN_FILENAME, clear_database)
+        self.keystore = SyncTokenStore()
+        if clear_database:
+            self.keystore.reset()
         self.my_email = None
 
     @classmethod
-    def read_calendar_sources(cls) -> Dict[str,TokenStoreValue] :
-        token_store = SyncTokenStore(CALENDAR_TOKEN_FILENAME, False)
+    def read_calendar_sources(cls) -> Dict[str, TokenStoreValue]:
+        token_store = SyncTokenStore()
         return token_store.items()
 
+    @classmethod
+    def read_calendar_names(cls) -> list[str]:
+        token_store = SyncTokenStore()
+        values: dict[str, TokenStoreValue] = token_store.items()
+
+        return [v.name for v in values.values()]
 
     @classmethod
     def get_latest_sync(cls) -> Optional[TokenStoreValue]:
-        token_store = SyncTokenStore(CALENDAR_TOKEN_FILENAME, False)
+        token_store = SyncTokenStore()
         items: Dict[str, TokenStoreValue] = token_store.items()
 
         if not items:

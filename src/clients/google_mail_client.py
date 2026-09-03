@@ -1,7 +1,11 @@
 import base64
 import os
 from email.message import EmailMessage
-from typing import Any, Optional, cast, Dict
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pathlib import Path
+from typing import Any, Optional, cast, Dict, List
 
 # noinspection PyPackageRequirements
 from google.oauth2.credentials import Credentials
@@ -68,7 +72,7 @@ class GmailTextSender:
             to_email: str,
             subject: str,
             body_text: str,
-            attachment_path: Optional[str] = None
+            attachment_path: Optional[Path] = None
     ) -> GoogleClientJsonType:
         """
         Build a MIME email with optional attachment.
@@ -101,22 +105,49 @@ class GmailTextSender:
             to: str,
             subject: str,
             body: str,
-            attachment_path: Optional[str] = None
+            attachment_path: Optional[List[Path]] = None
     ) -> Any:
         """
         Public method: send a report email.
         Returns Gmail API response dict.
         """
-
-        message = self._build_message(
-            to_email=to,
-            subject=subject,
-            body_text=body,
-            attachment_path=attachment_path,
-        )
+        if attachment_path is None:
+            message = self._build_message(
+                to_email=to,
+                subject=subject,
+                body_text=body
+            )
+        elif len(attachment_path) == 1:
+            message = self._build_message(
+                to_email=to,
+                subject=subject,
+                body_text=body,
+                attachment_path=attachment_path[0]
+            )
+        else:
+            message = self._build_message_with_mime(to, subject, body, attachment_path)
 
         return google_call(
             self.service.users().messages().send,
             userId="me",
             body=message
         )
+
+    @classmethod
+    def _build_message_with_mime(cls, to_email, subject, body_text, pdf_paths) -> Any:
+        msg = MIMEMultipart()
+        msg["To"] = to_email
+        msg["Subject"] = subject
+
+        # Text body
+        msg.attach(MIMEText(body_text, "plain"))
+
+        # Attach each PDF
+        for path in pdf_paths:
+            with open(path, "rb") as f:
+                part = MIMEApplication(f.read(), Name=os.path.basename(path))
+            part["Content-Disposition"] = f'attachment; filename="{os.path.basename(path)}"'
+            msg.attach(part)
+
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        return {"raw": raw}

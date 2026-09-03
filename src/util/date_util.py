@@ -1,8 +1,46 @@
+from datetime import date
 from datetime import datetime, timezone
 from typing import Optional, Any
 from zoneinfo import ZoneInfo
 
 from src.services.env import MIRROR_MONTHS_MIN, MIRROR_MONTHS_MAX, LOCAL_TZ
+
+
+def parse_datestamp(datestamp: str) -> date:
+    """
+    Convert YYYYMMDD string into a date object.
+    Example: "20260809" -> date(2026, 8, 9)
+    """
+    year = int(datestamp[:4])
+    month = int(datestamp[4:6])
+    day = int(datestamp[6:8])
+    return date(year, month, day)
+
+
+def compute_year_month_with_offset(month_relative: int) -> tuple[int, int]:
+    """
+    Compute (year, month) based on today's date plus a relative month offset.
+    month_relative may be negative or positive.
+    Example: month_relative = +1 → next month
+             month_relative = -2 → two months ago
+    """
+
+    today = date.today()
+    year = today.year
+    month = today.month
+
+    # Convert to absolute month index
+    # Example: 2026-09 → absolute = 2026*12 + 9 = 24321
+    absolute = year * 12 + (month - 1)
+
+    # Apply offset
+    absolute += month_relative
+
+    # Convert back to year/month
+    new_year = absolute // 12
+    new_month = (absolute % 12) + 1
+
+    return new_year, new_month
 
 
 def google_to_rfc3339(obj: Any) -> str:
@@ -35,6 +73,7 @@ def google_to_datetime(obj: dict) -> datetime:
         dt = datetime.fromisoformat(obj["date"])
         return dt.replace(tzinfo=LOCAL_TZ)
     raise RuntimeError("no date conversion setup")
+
 
 def calendar_tz_name(dt: datetime) -> str:
     if dt.tzinfo is None:
