@@ -1,3 +1,6 @@
+import os
+os.environ["ICAL_TEST_MODE"] = "1"
+
 from src.reporter.calendar_month_pdf import MonthEvents, DayEvent, render_month_pdf, \
     CalendarPageInfo, get_page_for
 from src.util.filesystem import get_log_directory
@@ -32,4 +35,5 @@ def main() -> None:
     get_page_for("Gathering Area",2026,9)
 
 if __name__ == "__main__":
+
     main()

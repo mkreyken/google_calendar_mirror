@@ -1,7 +1,6 @@
+import os
+
 from src.reporter.auditer import remote_audit
 
-
-def main() -> None:
-    remote_audit()
-
-main()
+os.environ["ICAL_TEST_MODE"] = "1"
+remote_audit()

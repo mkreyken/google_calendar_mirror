@@ -1,3 +1,9 @@
+## installing to a computer:
+* run the tools/app_builder.py
+* run the tools/copy_dist.py
+* copy downloads/iCal to a device
+* Copy to C:\Users\<user>>\AppData\Roaming
+
 ## Create a Custom uv Python Environment
 * uv and intellij get confused, even pyharm,
 * Download and run uv to build your system
@@ -61,4 +67,9 @@ in Intellij add the above directory available for all projects
 * takes some time to build :
 * https://console.cloud.google.com/home/dashboard?authuser=3&project=calendarmirror-1
 * this project is not linked to a billign account
-* AUdiace = internal = only in the domain
+* Audience = internal = only in the domain
+
+```
+
+# Updating packages:
+* pip install --upgrade -r requirements.txt

@@ -1,6 +1,8 @@
 /secrets/
 /data/
 /logs/
+/build/
+/dist/
 /uv.lock
 /.idea/
 __pycache__/
@@ -10,4 +12,5 @@ __pycache__/
 *.log
 *.json
 *.iml
+*.spec
 

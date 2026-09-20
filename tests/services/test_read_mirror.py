@@ -1,3 +1,6 @@
+import os
+os.environ["ICAL_TEST_MODE"] = "1"
+
 from src.api.calendar_source_info import CalendarMappingApi
 from src.api.mirror_calendar_manager import MirrorCalendarManager
 from src.clients.google_calendar_client import GoogleCalendarClient

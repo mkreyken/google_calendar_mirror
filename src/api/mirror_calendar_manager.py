@@ -30,6 +30,7 @@ from src.api.calendar_source_info import CalendarMappingApi
 from src.api.types import EventType, MappingEvent, STATUS_CANCELLED, STATUS_DELETED, BadEvent, \
     GoogleEventData, CalendarPageData, CalendarSourceInfo
 from src.clients.google_calendar_client import GoogleCalendarClient
+from src.clients.mirror_key_store import TokenStoreValue
 from src.clients.settings_on_disk import SETTINGS, MY_TIMEZONE
 from src.services.events_converter import EventConverter
 from src.util.date_util import max_mirror_date, min_mirror_date
@@ -56,7 +57,7 @@ class MirrorCalendarManager:
         self.calendars = calendars
 
     @classmethod
-    def mapping_file(cls) -> Dict[str, MappingEvent] |None:
+    def mapping_file(cls) -> Dict[str, MappingEvent] | None:
         filename = cls.find_latest_mirror_filename()
         if not filename:
             return None
@@ -146,9 +147,9 @@ class MirrorCalendarManager:
 
         # Must loop for updated vs unchanged
         for key in old_keys & new_keys:
-            if old[key] != new[key] :
+            if old[key] != new[key]:
                 counts["map updated"] += 1
-            else :
+            else:
                 counts["map unchanged"] += 1
         return counts
 
@@ -365,8 +366,8 @@ class MirrorCalendarManager:
             candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return candidates[0]
 
-    def log_change(self, event:EventType,deleted:bool)->  None:
-        if event.is_recurring :
+    def log_change(self, event: EventType, deleted: bool) -> None:
+        if event.is_recurring:
             return
         cal = self.calendars.calendars.get(event.source_calendar_id)
         if cal:
@@ -381,9 +382,9 @@ class MirrorCalendarManager:
         if not isinstance(my_timezone, str):
             raise ValueError("timezone is not defined")
 
+        calendars: Dict[str, TokenStoreValue] = CalendarMappingApi.read_calendar_sources()
+
         status_counts = Counter[str]()
-        updated_daily = Counter[str]()
-        synced_daily = Counter[str]()
         updated_weekly = Counter[Tuple[str, str]]()
         synced_weekly = Counter[Tuple[str, str]]()
 
@@ -404,27 +405,20 @@ class MirrorCalendarManager:
             end_d = start_d + timedelta(days=6)  # Sunday
             return str(start_d), str(end_d)
 
-        # Build the last 7 calendar days in local timezone
-        last_7_days = []
-        for i in range(7):
-            d = (now - timedelta(days=i)).date()
-            last_7_days.append(str(d))
-
-        last_7_days.sort()  # oldest → newest
 
         for ev in events.values():
+            cal_name_data= calendars[ev.source_calendar_id]
+            if cal_name_data:
+                cal_name = cal_name_data.name
+                status_counts[cal_name] += 1
+            else :
+                status_counts["<unKnown>?"] +=1
 
             updated_dt = parse(ev.updated_at)
             synced_dt = parse(ev.last_synced_at)
 
             updated_day = str(updated_dt.date())
             synced_day = str(synced_dt.date())
-
-            # Daily (last 7 days)
-            if updated_dt >= one_week_ago:
-                updated_daily[updated_day] += 1
-            if synced_dt >= one_week_ago:
-                synced_daily[synced_day] += 1
 
             # Weekly (use date ranges instead of ISO week numbers)
             updated_week = week_range(updated_dt)
@@ -434,29 +428,20 @@ class MirrorCalendarManager:
             synced_weekly[synced_week] += 1
 
         # Build output
-        lines = ["=== Status Totals ==="]
+        lines = ["=== Totals ==="]
+        lines.append("=== Events by Venue ===")
         for status, count in status_counts.items():
             lines.append(f"{status}: {count}")
 
         lines.append("")
-        lines.append("=== Updated_at Daily (Last 7 Days) ===")
-        for day in last_7_days:
-            count = synced_daily.get(day, 0)
-            lines.append(f"{day}: {count}")
-
-        lines.append("")
-        lines.append("=== Last_synced_at Daily (Last 7 Days) ===")
-        for day, count in sorted(synced_daily.items()):
-            lines.append(f"{day}: {count}")
-
-        lines.append("")
         lines.append("=== Updated_at Weekly Totals ===")
-        for (start, end), count in sorted(updated_weekly.items()):
+        for (start, end), count in sorted(updated_weekly.items(), reverse=True):
             lines.append(f"{start} → {end}: {count}")
 
         lines.append("")
         lines.append("=== Last_synced_at Weekly Totals ===")
-        for (start, end), count in sorted(synced_weekly.items()):
+        for (start, end), count in sorted(synced_weekly.items(), reverse=True):
             lines.append(f"{start} → {end}: {count}")
+
 
         return lines

@@ -5,12 +5,19 @@ from typing import Any
 
 from src.services.env import TOKEN_FILE, SECRETS_FILE
 
+APP_NAME = "CalendarApi"  # or whatever your app is called
 SECRETS_DIRECTORY = "secrets/"
 DATA_DIRECTORY = "data/"
 LOG_DIRECTORY = "logs/"
+TEST_MODE = os.environ.get("ICAL_TEST_MODE") == "1"
 
+def project_root(installed = True) -> Path:
+    if installed and not TEST_MODE:
+        roaming_data = Path(os.environ["APPDATA"]) / "iCal" / "data"
+        if roaming_data.exists():
+            return roaming_data.parent
 
-def project_root() -> Path:
+    # --- Case 2: Normal Python execution ---
     current = Path(__file__).resolve().parent
 
     for parent in [current, *current.parents]:

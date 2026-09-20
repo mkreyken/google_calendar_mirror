@@ -1,3 +1,5 @@
+import os
+os.environ["ICAL_TEST_MODE"] = "1"
 from datetime import datetime, timezone
 
 from src.clients.google_calendar_client import GoogleCalendarClient

@@ -3,7 +3,7 @@
 * Ensure sharing is not enabled on the venue calendars
 * Run in the tray so it can be disabled, and can run reports
 
-# Timezonss:
+# Timezones:
 * Recurring events shift with the timezone as it moves along, so using single_events, and including timezone in the computation,
 * ensures no issues
 

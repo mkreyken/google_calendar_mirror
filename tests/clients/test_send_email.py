@@ -1,3 +1,6 @@
+import os
+os.environ["ICAL_TEST_MODE"] = "1"
+
 from src.clients.google_mail_client import GmailTextSender
 
 TEST_EMAIL = "michael@icdelta.ca"

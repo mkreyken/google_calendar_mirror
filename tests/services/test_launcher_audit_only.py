@@ -1,3 +1,6 @@
+import os
+os.environ["ICAL_TEST_MODE"] = "1"
+
 from src.services.env import AUDIT
 from src.services.launcher import SyncManager
 

@@ -60,7 +60,7 @@ def deleted_events(client: GoogleCalendarClient) -> str:
         events: list[GoogleEventData] = client.deleted_calendar_events(cal_id, time_min)
         for google_event in events:
             event = EventConverter.to_event_data(google_event, cal_id)
-            line = f"Deleted on calendar {calendar.name}, {event.summary} , at {google_to_rfc3339(event.start)}"
+            line = f"{event.summary} at {google_to_rfc3339(event.start)} from calendar {calendar.name} was deleted on {event.updated_at}"
             lines.append(line)
     return "\n".join(lines)
 

@@ -321,7 +321,9 @@ class TrayController:
         if self.sync_manager.is_running():
             self.notification_manager.send_toast("Sync Status", "Running")
             return
-        pass
+        to_val = SETTINGS.get(EMAIL_TO_LOGS)
+        if isinstance(to_val, str):
+            ReportsManager().full_report(to_val)
 
     # --- Menu creation ---
 
