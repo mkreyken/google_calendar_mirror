@@ -16,6 +16,7 @@ from src.clients.google_calendar_client import GoogleCalendarClient
 from src.clients.mirror_key_store import TokenStoreValue
 from src.clients.settings_on_disk import SETTINGS, MAXIMUM_MULTI_DAY_EVENT
 from src.services.env import LOCAL_TZ
+from src.services.events_converter import EventConverter
 from src.util.date_util import google_to_datetime
 from src.util.filesystem import get_log_directory
 
@@ -199,7 +200,8 @@ def get_page_for(calendar_name: str, year: int, month: int) -> Path:
 
     days: Dict[int, List[DayEvent]] = {}
 
-    for evt in events:
+    for raw_evt in events:
+        evt = EventConverter.sanitize_event(raw_evt)
         start_dt = google_to_datetime(evt.start)
         end_dt = google_to_datetime(evt.end)
 
